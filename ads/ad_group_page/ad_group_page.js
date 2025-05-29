@@ -10,7 +10,7 @@
 
 (function() {
     'use strict';
-
+    console.log("[Tampermonkey] Ad Group Enhancer Script STARTED");
     function initTableEnhancements() {
         var table = Tabulator.findTable("#ad-groups-table")[0];
         if (!table) return;
