@@ -273,7 +273,7 @@
         });
 
         document.addEventListener("keydown", function(event) {
-            if (event.metaKey && event.key === "c") {
+            if (event.metaKey && event.key === "x") {
                 let selectedRows = table.getSelectedRows();
                 if (selectedRows.length === 0) {
                     console.warn("沒有選擇任何行，無法複製");
