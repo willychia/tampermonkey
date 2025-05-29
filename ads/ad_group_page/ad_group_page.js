@@ -12,7 +12,12 @@
 (function() {
     'use strict';
 
-    function initTableEnhancements() {
+    
+// ===========================================
+// 🧩 功能初始化主程序：初始化表格與增強邏輯
+// ===========================================
+function initTableEnhancements() {
+
         var table = Tabulator.findTable("#ad-groups-table")[0];
         if (!table) return;
 
@@ -46,7 +51,7 @@
 
         let hoveredRow = null; // 記錄當前 Hover 的行
 
-        // ✅ 1. 當 Hover 列時，外框變成粗紅色
+        // ✅ [功能] 滑鼠懸停行 → 外框標示為紅色
         table.on("rowMouseEnter", function(e, row) {
             hoveredRow = row;
             let rowElement = row.getElement();
@@ -60,7 +65,7 @@
             hoveredRow = null;
         });
 
-        // ✅ 2. 當列被勾選時，外框變成粗黃色
+        // ✅ [功能] 勾選行時 → 外框標示為白色
         table.on("rowSelected", function(row) {
             row.getElement().style.border = "3px solid white";
         });
@@ -69,7 +74,7 @@
             row.getElement().style.border = "";
         });
 
-        // ✅ 1. 創建右上角的顯示框
+        // ✅ [UI] 建立右上角選取列數的顯示區塊
         let counterDiv = document.createElement("div");
         counterDiv.id = "selection-counter";
         counterDiv.style.position = "fixed";
@@ -98,7 +103,7 @@
 
         console.log("勾選計數器已啟動");
 
-        // ✅ 3. 當 Hover 列且按下 Enter 時，該列勾選/取消勾選
+        // ✅ [快捷鍵] Enter → 切換目前 Hover 行的選取狀態
         document.addEventListener("keydown", function(event) {
             if (event.key === "Enter" && hoveredRow) {
                 event.preventDefault(); // 阻止預設行為
@@ -106,7 +111,7 @@
             }
         });
 
-        // ✅ 4. Cmd + 上方向鍵：取消當前勾選並改選上一列
+        // ✅ [快捷鍵] Cmd/Ctrl + ↑ → 選取上一行
         document.addEventListener("keydown", function(event) {
             if ((event.metaKey || event.ctrlKey) && event.key === "ArrowUp") {
                 event.preventDefault(); // 阻止預設行為
@@ -121,7 +126,7 @@
             }
         });
 
-        // ✅ 5. Cmd + 下方向鍵：取消當前勾選並改選下一列
+        // ✅ [快捷鍵] Cmd/Ctrl + ↓ → 選取下一行
         document.addEventListener("keydown", function(event) {
             if ((event.metaKey || event.ctrlKey) && event.key === "ArrowDown") {
                 event.preventDefault(); // 阻止預設行為
@@ -136,7 +141,7 @@
             }
         });
 
-        // ✅ 6. Cmd + E：全部勾選/全部取消勾選
+        // ✅ [快捷鍵] Cmd/Ctrl + E → 勾選 / 取消所有列
         document.addEventListener("keydown", function(event) {
             if ((event.metaKey || event.ctrlKey) && event.key === "e") {
                 event.preventDefault(); // 阻止預設行為
@@ -150,7 +155,7 @@
             }
         });
 
-        // ✅ 7. Cmd + F：num_enabled_targets < 10 時，變成淡黃色 + 深紅色文字
+        // ✅ [快捷鍵] Cmd/Ctrl + F → 高亮並勾選符合條件的列（如 num_enabled_targets < 10）
         document.addEventListener("keydown", function(event) {
             if ((event.metaKey || event.ctrlKey) && event.key === "f") {
                 event.preventDefault(); // 阻止預設行為
@@ -312,8 +317,13 @@
             }
         });
 
-        // ✅ 8. Cmd + 1：執行 openHeaderMenuAndClickOption(0, 0)
-        function openHeaderMenuAndClickOption(columnIndex = 0, optionIndex = 0) {
+        // ✅ [快捷鍵] Cmd/Ctrl + 數字鍵 → 開啟表格欄位排序選單
+        
+// ===========================================
+// 🔧 公用函式：點擊表格欄位選單中的選項
+// ===========================================
+function openHeaderMenuAndClickOption(columnIndex = 0, optionIndex = 0) {
+
             let menuButtons = document.querySelectorAll('.tabulator-col .tabulator-header-popup-button');
             if (menuButtons[columnIndex]) {
                 menuButtons[columnIndex].click(); // 打開選單
@@ -371,7 +381,12 @@
 
 
         // ✅ 複製到剪貼簿
-        function copyToClipboard(text) {
+        
+// ===========================================
+// 📋 公用函式：複製文字到剪貼簿
+// ===========================================
+function copyToClipboard(text) {
+
             let textarea = document.createElement("textarea");
             textarea.value = text;
             document.body.appendChild(textarea);
@@ -381,7 +396,12 @@
         }
 
         // ✅ 新增右下角的「回到最上方」與「回到最下方」按鈕
-        function createRightDownButton(text, right, bottom, action) {
+        
+// ===========================================
+// 🖱️ UI 建立：右下角功能按鈕產生器
+// ===========================================
+function createRightDownButton(text, right, bottom, action) {
+
             let btn = document.createElement("button");
             btn.innerText = text;
             btn.style.position = "fixed";
@@ -426,7 +446,12 @@
             }
         };
 
-        function scrollSelectedRowToTop() {
+        
+// ===========================================
+// 🧭 輔助功能：將選取的行滾動到頁面頂部
+// ===========================================
+function scrollSelectedRowToTop() {
+
             let selectedRows = table.getSelectedRows();
 
             if (selectedRows.length === 0) {
