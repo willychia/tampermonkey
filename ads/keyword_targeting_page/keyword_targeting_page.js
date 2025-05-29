@@ -1,10 +1,12 @@
 // ==UserScript==
-// @name         Admin Keyword Page Additional Function
+// @name         Keyword Targeting Page Additional Function
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2025-05-29
 // @description  Add enhanced features to Tabulator table, using tabulator
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/keyword_targeting_page/keyword_targeting_page.js
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/keyword_targeting_page/keyword_targeting_page.js
 // @grant        none
 // ==/UserScript==
 
