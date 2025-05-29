@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Admin Product Page Additional Function
+// @name         Product Targeting Page Additional Function
 // @namespace    http://tampermonkey.net/
 // @version      2025-05-29
 // @description  Add enhanced features to Tabulator table, using tabulator
