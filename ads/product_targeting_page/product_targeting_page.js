@@ -1,10 +1,13 @@
 // ==UserScript==
 // @name         Admin Product Page Additional Function
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2025-05-29
 // @description  Add enhanced features to Tabulator table, using tabulator
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
+
 // @grant        none
 // ==/UserScript==
 
