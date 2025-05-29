@@ -7,7 +7,6 @@
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
 // @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
-
 // @grant        none
 // ==/UserScript==
 
