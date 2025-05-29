@@ -529,9 +529,17 @@
     }
 
     let checkTabulator = setInterval(() => {
-        if (typeof Tabulator !== "undefined" && Tabulator.findTable("#ad-groups-table").length > 0) {
-            clearInterval(checkTabulator);
-            initTableEnhancements();
+      if (typeof Tabulator !== "undefined") {
+        const tables = Tabulator.findTable("#ad-groups-table");
+        if (tables.length > 0) {
+          clearInterval(checkTabulator);
+          const table = tables[0];
+    
+          table.on("dataLoaded", () => {
+            console.log("✅ Table loaded");
+            initTableEnhancements(table);
+          });
         }
+      }
     }, 500);
 })();
