@@ -373,7 +373,7 @@
     });
     
     document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "c") {
+      if ((event.metaKey || event.ctrlKey) && event.key === "x") {
         event.preventDefault(); // 阻止預設行為
         openHeaderMenuAndClickOption(0, 5);
       }
