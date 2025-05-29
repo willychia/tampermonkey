@@ -166,62 +166,6 @@
             }
         });
 
-        /*
-        document.addEventListener("keydown", function(event) {
-            if (event.metaKey && event.key === "d") {
-                event.preventDefault(); // 阻止預設行為
-                let selectedRows = table.getSelectedRows();
-                let links = [];
-
-                selectedRows.forEach(row => {
-                    let cell = row.getCell("product_image_url"); // 只抓這個欄位
-                    if (cell) {
-                        let cellElement = cell.getElement();
-                        let anchorTag = cellElement.querySelector("a"); // 找到 <a> 標籤
-                        if (anchorTag && anchorTag.href) {
-                            links.push(anchorTag.href); // 抓取 <a> 的 href 屬性
-                        }
-                    }
-                });
-
-                if (links.length > 0 && links.length <= 20) {
-                    links.forEach(link => window.open(link, "_blank")); // 在新分頁開啟
-                } else if (links.length > 20) {
-                    console.warn("勾選過多的超連結");
-                } else {
-                    console.warn("沒有找到可用的超連結");
-                }
-            }
-        });
-
-        document.addEventListener("keydown", function(event) {
-            if (event.metaKey && event.key === "k") {
-                event.preventDefault(); // 阻止預設行為
-                let selectedRows = table.getSelectedRows();
-                let links = [];
-
-                selectedRows.forEach(row => {
-                    let cell = row.getCell("num_enabled_targets"); // 只抓這個欄位
-                    if (cell) {
-                        let cellElement = cell.getElement();
-                        let anchorTag = cellElement.querySelector("a"); // 找到 <a> 標籤
-                        if (anchorTag && anchorTag.href) {
-                            links.push(anchorTag.href); // 抓取 <a> 的 href 屬性
-                        }
-                    }
-                });
-
-                if (links.length > 0 && links.length <= 20) {
-                    links.forEach(link => window.open(link, "_blank")); // 在新分頁開啟
-                } else if (links.length > 20) {
-                    console.warn("勾選過多的超連結");
-                } else {
-                    console.warn("沒有找到可用的超連結");
-                }
-            }
-        });
-        */
-
         // ✅ 8. Cmd + 1：執行 openHeaderMenuAndClickOption(0, 0)
         function openHeaderMenuAndClickOption(columnIndex = 0, optionIndex = 0) {
             let menuButtons = document.querySelectorAll('.tabulator-col .tabulator-header-popup-button');
@@ -259,50 +203,11 @@
         });
 
         document.addEventListener("keydown", function(event) {
-            if (event.metaKey && event.key === "c") {
+            if (event.metaKey && event.key === "x") {
                 event.preventDefault(); // 阻止預設行為
                 openHeaderMenuAndClickOption(3, 0);
             }
         });
-        /*
-        document.addEventListener("keydown", function(event) {
-            if (event.metaKey && event.key === "5") {
-                event.preventDefault(); // 阻止預設行為
-                openHeaderMenuAndClickOption(0, 4);
-            }
-        });
-
-        document.addEventListener("keydown", function(event) {
-            if (event.metaKey && event.key === "c") {
-                let selectedRows = table.getSelectedRows();
-                if (selectedRows.length === 0) {
-                    console.warn("沒有選擇任何行，無法複製");
-                    return;
-                }
-
-                let adGroupNames = [];
-
-                selectedRows.forEach(row => {
-                    let cell = row.getCell("ad_group_name"); // 取得 `ad_group_name` 欄位
-                    if (cell) {
-                        let cellElement = cell.getElement();
-                        let anchorTag = cellElement.querySelector("a"); // 找到 `<a>` 內的文字
-                        if (anchorTag) {
-                            adGroupNames.push(anchorTag.innerText.trim());
-                        }
-                    }
-                });
-
-                if (adGroupNames.length > 0) {
-                    let textToCopy = adGroupNames.join("\n"); // 轉換成多行文字
-                    copyToClipboard(textToCopy);
-                    console.log("已複製至剪貼簿:\n" + textToCopy);
-                } else {
-                    console.warn("沒有找到可複製的 `ad_group_name`");
-                }
-            }
-        });
-        */
 
         // ✅ 複製到剪貼簿
         function copyToClipboard(text) {
