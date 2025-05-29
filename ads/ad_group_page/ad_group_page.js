@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Admin Ad Group Additional Function
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2025-05-29
 // @description  Add enhanced features to Tabulator table, using tabulator
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
@@ -529,17 +529,9 @@
     }
 
     let checkTabulator = setInterval(() => {
-      if (typeof Tabulator !== "undefined") {
-        const tables = Tabulator.findTable("#ad-groups-table");
-        if (tables.length > 0) {
-          clearInterval(checkTabulator);
-          const table = tables[0];
-    
-          table.on("dataLoaded", () => {
-            console.log("✅ Table loaded");
-            initTableEnhancements(table);
-          });
+        if (typeof Tabulator !== "undefined" && Tabulator.findTable("#ad-groups-table").length > 0) {
+            clearInterval(checkTabulator);
+            initTableEnhancements();
         }
-      }
     }, 500);
 })();
