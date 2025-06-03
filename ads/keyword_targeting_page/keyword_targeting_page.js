@@ -166,6 +166,29 @@
       }
     });
 
+    document.addEventListener("keydown", function(event) {
+      if ((event.metaKey || event.ctrlKey) && event.key === "s") {
+        event.preventDefault();
+        let filteredRows = table.getRows("active"); // 取得目前篩選後的行
+        
+        if (filteredRows.length === 0) {
+          console.warn("沒有篩選後的資料可供下載");
+          return;
+        }
+        
+        // ✅ 將篩選後的數據轉換為 JSON
+        let dataToExport = filteredRows.map(row => row.getData());
+        
+        // ✅ 下載 Excel 檔案
+        table.download("xlsx", "filtered_table.xlsx", {
+          sheetName: "Filtered Data",
+          data: dataToExport // 只下載篩選後的資料
+        });
+        
+        console.log("篩選後的表格已下載");
+      }
+    });
+
     // ✅ 8. Cmd + 1：執行 openHeaderMenuAndClickOption(0, 0)
     function openHeaderMenuAndClickOption(columnIndex = 0, optionIndex = 0) {
       let menuButtons = document.querySelectorAll('.tabulator-col .tabulator-header-popup-button');
@@ -203,7 +226,7 @@
     });
 
     document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "c") {
+      if (event.metaKey && event.key === "x") {
         event.preventDefault(); // 阻止預設行為
         openHeaderMenuAndClickOption(3, 0);
       }
