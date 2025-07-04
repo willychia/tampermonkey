@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additonal Function
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-04
+// @version      2025-07-04.1
 // @description  Add functions to Amazon Ads ad group page
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250704
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250704
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=202507041
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=202507041
 // @grant        none
 // ==/UserScript==
 
