@@ -21,7 +21,8 @@ The script provides a suite of UI and functional enhancements for interacting wi
   - `Cmd/Ctrl + K`: Open `num_enabled_targets` links from selected rows.
   - `Cmd/Ctrl + S`: Export filtered table data to Excel.
   - `Cmd/Ctrl + J`: Select all rows with missing product image URLs.
-  - `Cmd/Ctrl + 1-5, C`: Clicks column header menu items by index.
+  - `Cmd/Ctrl + X`: Copy all Selected rows' Ad Group Name
+  - `Cmd/Ctrl + 1-5`: Clicks column header menu items by index.
 - **Scroll Buttons**: Buttons in lower-right corner for scrolling to top/bottom.
 - **Group Expand/Collapse Buttons**: Buttons to expand/collapse grouped rows.
 - **ASIN Filter Box**: Manually enter ASINs to auto-select matching rows.
