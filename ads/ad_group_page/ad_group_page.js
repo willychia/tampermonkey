@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additonal Function
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-22.01
+// @version      2025-07-30
 // @description  Add functions to Amazon Ads ad group page
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250722
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250722
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250730
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250730
 // @grant        none
 // ==/UserScript==
 
@@ -40,6 +40,21 @@
           headerFilter: "number",
           headerFilterFunc: "<=",
           headerFilterPlaceholder: "Less than"
+        };
+      } else if (col.field === "last_buy_box_timestamp") {
+        return {
+          ...col,
+          headerFilter: "number",
+          headerFilterFunc: function(cellValue, filterValue, rowData) {
+            if (!cellValue) return false;
+      
+            const now = new Date();
+            const timestamp = new Date(cellValue);
+            const diffInHours = (now - timestamp) / (1000 * 60 * 60); // 毫秒轉小時
+      
+            return diffInHours <= parseFloat(filterValue);
+          },
+          headerFilterPlaceholder: "Hours within",
         };
       }
       return col;
