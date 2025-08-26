@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additonal Function
 // @namespace    http://tampermonkey.net/
-// @version      2025-08-26
+// @version      2025-08-26.01
 // @description  Add functions to Amazon Ads ad group page
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250826
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250826
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025082601
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025082601
 // @grant        none
 // ==/UserScript==
 
@@ -334,9 +334,7 @@
 
     // Cmd/Ctrl + Q → 選取當前「頁面」的前 10 列
     document.addEventListener("keydown", function(event) {
-      // mac 用 metaKey，Windows/Linux 用 ctrlKey；兩者其一即可
-      const isCmdOrCtrl = event.metaKey || event.ctrlKey;
-      if (isCmdOrCtrl && event.key.toLowerCase() === "q") {
+      if ((event.metaKey || event.ctrlKey) && event.key === "q") {
         event.preventDefault(); // 嘗試阻止預設行為（注意 macOS 可能仍由瀏覽器接管退出）
         const rows = table.getRows("active"); // 只取當前頁面的有效行（已考慮排序/篩選/分頁）
         if (!rows || rows.length === 0) {
