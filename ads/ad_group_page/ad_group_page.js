@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additonal Function
 // @namespace    http://tampermonkey.net/
-// @version      2025-07-30.01
+// @version      2025-08-26
 // @description  Add functions to Amazon Ads ad group page
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025073001
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025073001
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250826
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250826
 // @grant        none
 // ==/UserScript==
 
@@ -331,7 +331,29 @@
         
       }
     });
+
+    // Cmd/Ctrl + Q → 選取當前「頁面」的前 10 列
+    document.addEventListener("keydown", function(event) {
+      // mac 用 metaKey，Windows/Linux 用 ctrlKey；兩者其一即可
+      const isCmdOrCtrl = event.metaKey || event.ctrlKey;
+      if (isCmdOrCtrl && event.key.toLowerCase() === "q") {
+        event.preventDefault(); // 嘗試阻止預設行為（注意 macOS 可能仍由瀏覽器接管退出）
+        const rows = table.getRows("active"); // 只取當前頁面的有效行（已考慮排序/篩選/分頁）
+        if (!rows || rows.length === 0) {
+          console.warn("當前頁面沒有可選取的列");
+          return;
+        }
     
+        table.deselectRow(); // 清空舊選取
+        const pick = rows.slice(0, 10); // 取前 10 列（不足 10 就取全部）
+        pick.forEach(r => r.select());
+    
+        // 讓第一列可見並置頂
+        table.scrollToRow(pick[0], "top", true);
+        console.log(`已選取當前頁面的前 ${pick.length} 列`);
+      }
+    });
+
     // ✅ [快捷鍵] Cmd/Ctrl + 數字鍵 → 開啟表格欄位排序選單
     
     // ===========================================
