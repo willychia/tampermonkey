@@ -1,598 +1,507 @@
 // ==UserScript==
-// @name         Ad Group Page Additonal Function
+// @name         Ad Group Page Additional Functions (stable merge)
 // @namespace    http://tampermonkey.net/
-// @version      2025-08-26.03
-// @description  Add functions to Amazon Ads ad group page
+// @version      2025.09.05.2
+// @description  Keep all your features + safer init, CSS classes, keybind guards, and small UX fixes for Tabulator on the ad group page.
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025082603
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025082603
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250905
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250905
+// @run-at       document-idle
 // @grant        none
 // ==/UserScript==
 
-(function() {
-  'use strict';
-  
-  
-  // ===========================================
-  // 🧩 功能初始化主程序：初始化表格與增強邏輯
-  // ===========================================
-  function initTableEnhancements() {
-    
-    var table = Tabulator.findTable("#ad-groups-table")[0];
-    if (!table) return;
-    
-    let columns = table.getColumnDefinitions();
-    
-    columns[0].field = "checkBox"; // 幫第一欄補上 field
-    
-    // 找到你想篩選的欄位（例如 num_enabled_targets）
-    columns = columns.map(col => {
-      if (col.field === "num_enabled_targets") {
+(function () {
+  "use strict";
+
+  /** =========================
+   *  Config / Constants
+   *  ========================= */
+  const TABLE_SELECTOR = "#ad-groups-table";
+  const RETRY_MS = 500;
+  const MAX_TRIES = 60; // ~30s
+  const STYLE_ID = "agp-enhance-style";
+  const COUNTER_ID = "selection-counter";
+  const INIT_FLAG = "__agpEnhanced";
+
+  /** =========================
+   *  Utils
+   *  ========================= */
+  const isEditing = (ev) => {
+    const el = ev.target;
+    if (!el) return false;
+    const tag = (el.tagName || "").toLowerCase();
+    const editable = el.isContentEditable;
+    return editable || tag === "input" || tag === "textarea" || tag === "select";
+  };
+
+  const hasTabulator = () =>
+    typeof window.Tabulator !== "undefined" &&
+    typeof window.Tabulator.findTable === "function";
+
+  const getFirstTable = () => {
+    if (!hasTabulator()) return null;
+    const arr = window.Tabulator.findTable(TABLE_SELECTOR) || [];
+    return arr[0] || null;
+  };
+
+  const waitForTableAndInit = (tries = 0) => {
+    try {
+      const table = getFirstTable();
+      if (table && !table[INIT_FLAG]) {
+        initTableEnhancements(table);
+        return;
+      }
+    } catch (_) {}
+    if (tries < MAX_TRIES) {
+      setTimeout(() => waitForTableAndInit(tries + 1), RETRY_MS);
+    }
+  };
+
+  const observeForTable = () => {
+    const obs = new MutationObserver(() => {
+      const table = getFirstTable();
+      if (table && !table[INIT_FLAG]) {
+        initTableEnhancements(table);
+      }
+    });
+    obs.observe(document.documentElement || document.body, {
+      childList: true,
+      subtree: true,
+    });
+  };
+
+  const ensureStyleInstalled = () => {
+    if (document.getElementById(STYLE_ID)) return;
+    const style = document.createElement("style");
+    style.id = STYLE_ID;
+    style.textContent = `
+      .tmk-row-hover { outline: 3px solid red !important; outline-offset: -2px; }
+      .tmk-row-selected { outline: 3px solid white !important; outline-offset: -2px; }
+
+      #${COUNTER_ID}{
+        position: fixed;
+        top: 10px;
+        right: 80px;
+        z-index: 9999;
+        padding: 8px 15px;
+        background: rgba(0,0,0,.7);
+        color: #fff;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 700;
+        pointer-events: none;
+        box-shadow: 0 4px 14px rgba(0,0,0,.25);
+      }
+
+      .agp-mini-btn{
+        position: fixed;
+        z-index: 9999;
+        padding: 10px 15px;
+        background: rgba(0,0,0,.7);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 14px;
+      }
+      .agp-mini-btn:hover{ background: #000; }
+    `;
+    document.head.appendChild(style);
+  };
+
+  /** =========================
+   *  Core Enhancements (merged)
+   *  ========================= */
+  function initTableEnhancements(table) {
+    try {
+      if (table[INIT_FLAG]) return;
+      table[INIT_FLAG] = true;
+
+      ensureStyleInstalled();
+
+      // —— 1) 你原本：把第一欄補上 field=checkBox（後面 setSort 會用到）
+      try {
+        const defs = table.getColumnDefinitions();
+        if (Array.isArray(defs) && defs.length > 0) {
+          defs[0].field = "checkBox";
+          table.setColumns(defs);
+        }
+      } catch (e) {}
+
+      // —— 2) 數字 / 相對時間 headerFilter（加上防呆）
+      enhanceColumns(table);
+
+      // —— 3) 滑鼠 hover / 勾選外框（改為 class，避免重繪洗掉）
+      installRowHighlight(table);
+
+      // —— 4) 右上角勾選列數
+      attachSelectionCounter(table);
+
+      // —— 5) 右下角按鈕（展開/收起群組、回頂/回底）
+      installCornerButtons(table);
+
+      // —— 6) 快捷鍵（完整保留並加「輸入中不觸發」的防呆）
+      installHotkeys(table);
+
+      // —— 7) ASIN 批次勾選盒
+      installAsinPicker(table);
+
+      console.info("[Ad Group Page] Enhancements initialized.");
+    } catch (err) {
+      console.error("[Ad Group Page] init error:", err);
+    }
+  }
+
+  function enhanceColumns(table) {
+    const original = table.getColumnDefinitions() || [];
+    const cols = original.map(col => {
+      if (col.field === "num_enabled_targets" || col.field === "stock_on_hand") {
         return {
           ...col,
           headerFilter: "number",
           headerFilterFunc: "<=",
-          headerFilterPlaceholder: "Less than"
+          headerFilterPlaceholder: "Less than",
         };
-      } else if (col.field === "stock_on_hand") {
+      }
+      if (col.field === "last_buy_box_timestamp") {
         return {
           ...col,
           headerFilter: "number",
-          headerFilterFunc: "<=",
-          headerFilterPlaceholder: "Less than"
-        };
-      } else if (col.field === "last_buy_box_timestamp") {
-        return {
-          ...col,
-          headerFilter: "number",
-          headerFilterFunc: function(filterValue, cellValue) {
-            if (!cellValue) return false;
-      
-            const now = new Date();
-            const timestamp = new Date(cellValue);
-            const diffInHours = (now - timestamp) / (1000 * 60 * 60); // 毫秒轉小時
-      
-            return diffInHours <= parseFloat(filterValue);
-          },
           headerFilterPlaceholder: "Hours within",
+          headerFilterFunc: (filterValue, cellValue) => {
+            const v = parseFloat(filterValue);
+            if (!Number.isFinite(v)) return true;     // 空/非數字 → 不過濾
+            if (!cellValue) return false;
+            const t = new Date(cellValue);
+            if (Number.isNaN(t.getTime())) return false;
+            const hours = (Date.now() - t.getTime()) / 36e5;
+            return hours <= v;
+          },
         };
       }
       return col;
     });
-    
-    // 套用更新後的欄位設定
-    table.setColumns(columns);
-    
-    
-    let hoveredRow = null; // 記錄當前 Hover 的行
-    
-    // ✅ [功能] 滑鼠懸停行 → 外框標示為紅色
-    table.on("rowMouseEnter", function(e, row) {
-      hoveredRow = row;
-      let rowElement = row.getElement();
-      rowElement.style.border = "3px solid red";
+    table.setColumns(cols);
+    try { table.updateOption({ headerFilterLiveFilter: true }); } catch(_) {}
+  }
+
+  function installRowHighlight(table) {
+    table.on("rowMouseEnter", (_e, row) => {
+      row.getElement().classList.add("tmk-row-hover");
     });
-    
-    // 當滑鼠離開時，恢復原來的邊框
-    table.on("rowMouseLeave", function(e, row) {
-      let rowElement = row.getElement();
-      rowElement.style.border = row.isSelected() ? "3px solid white" : "";
-      hoveredRow = null;
+    table.on("rowMouseLeave", (_e, row) => {
+      const el = row.getElement();
+      el.classList.remove("tmk-row-hover");
+      // 勾選中會有白框
+      if (row.isSelected()) el.classList.add("tmk-row-selected");
+      else el.classList.remove("tmk-row-selected");
     });
-    
-    // ✅ [功能] 勾選行時 → 外框標示為白色
-    table.on("rowSelected", function(row) {
-      row.getElement().style.border = "3px solid white";
+    table.on("rowSelected", row => {
+      row.getElement().classList.add("tmk-row-selected");
     });
-    
-    table.on("rowDeselected", function(row) {
-      row.getElement().style.border = "";
+    table.on("rowDeselected", row => {
+      row.getElement().classList.remove("tmk-row-selected");
     });
-    
-    // ✅ [UI] 建立右上角選取列數的顯示區塊
-    let counterDiv = document.createElement("div");
-    counterDiv.id = "selection-counter";
-    counterDiv.style.position = "fixed";
-    counterDiv.style.top = "10px";
-    counterDiv.style.right = "80px";
-    counterDiv.style.zIndex = "9999";
-    counterDiv.style.padding = "8px 15px";
-    counterDiv.style.background = "rgba(0, 0, 0, 0.7)";
-    counterDiv.style.color = "white";
-    counterDiv.style.borderRadius = "5px";
-    counterDiv.style.fontSize = "14px";
-    counterDiv.style.fontWeight = "bold";
-    counterDiv.innerText = "已選擇 0 列";
-    
-    document.body.appendChild(counterDiv);
-    
-    // ✅ 2. 更新顯示數字
-    function updateSelectionCounter() {
-      let selectedCount = table.getSelectedRows().length;
-      counterDiv.innerText = `已選擇 ${selectedCount} 列`;
+  }
+
+  function attachSelectionCounter(table) {
+    let counter = document.getElementById(COUNTER_ID);
+    if (!counter) {
+      counter = document.createElement("div");
+      counter.id = COUNTER_ID;
+      counter.textContent = "已選擇 0 列";
+      document.body.appendChild(counter);
     }
-    
-    // ✅ 3. 監聽勾選變更
-    table.on("rowSelected", updateSelectionCounter);
-    table.on("rowDeselected", updateSelectionCounter);
-    
-    console.log("勾選計數器已啟動");
-    
-    // ✅ [快捷鍵] Enter → 切換目前 Hover 行的選取狀態
-    document.addEventListener("keydown", function(event) {
+    const update = () => {
+      counter.textContent = `已選擇 ${table.getSelectedRows().length} 列`;
+    };
+    table.on("rowSelectionChanged", update);
+    update();
+  }
+
+  function installCornerButtons(table) {
+    const mkBtn = (text, right, bottom, action, title="") => {
+      const b = document.createElement("button");
+      b.className = "agp-mini-btn";
+      b.textContent = text;
+      b.style.right = right;
+      b.style.bottom = bottom;
+      if (title) b.title = title;
+      b.addEventListener("click", action);
+      document.body.appendChild(b);
+    };
+    const collapseAllGroups = () => {
+      const groups = table.getGroups() || [];
+      for (let i = 0; i < groups.length; i++) groups[i].hide();
+    };
+    const expandAllGroups = () => {
+      const groups = table.getGroups() || [];
+      for (let i = 0; i < groups.length; i++) groups[i].show();
+    };
+
+    mkBtn("E", "100px", "120px", expandAllGroups, "Expand groups");
+    mkBtn("C", "100px", "60px",  collapseAllGroups, "Collapse groups");
+    mkBtn("⬆", "50px",  "120px", () => window.scrollTo({ top: 0, behavior: "smooth" }), "Scroll to top");
+    mkBtn("⬇", "50px",  "60px",  () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), "Scroll to bottom");
+  }
+
+  function scrollSelectedRowToTop(table) {
+    const selected = table.getSelectedRows();
+    if (!selected.length) return;
+    const firstRow = selected[0];
+    table.scrollToRow(firstRow, "top", false).then(() => {
+      const rowEl = firstRow.getElement();
+      if (!rowEl) return;
+      const container = table.element;
+      const rowOffset = rowEl.offsetTop;
+      container.scrollTop = rowOffset;
+      const tableTopOffset = container.getBoundingClientRect().top + window.scrollY;
+      const targetY = rowOffset + tableTopOffset;
+      window.scrollTo({ top: targetY, behavior: "smooth" });
+    }).catch(() => {});
+  }
+
+  function copyToClipboard(text) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  }
+
+  function installHotkeys(table) {
+    // —— 公用：欄位排序選單操作
+    const openHeaderMenuAndClickOption = (columnIndex = 0, optionIndex = 0) => {
+      const buttons = document.querySelectorAll(".tabulator-col .tabulator-header-popup-button");
+      if (!buttons[columnIndex]) return;
+      buttons[columnIndex].click();
+      setTimeout(() => {
+        const items = document.querySelectorAll(".tabulator-menu-item");
+        if (items[optionIndex]) items[optionIndex].click();
+      }, 200);
+    };
+
+    let hoveredRow = null;
+    table.on("rowMouseEnter", (_e, row) => { hoveredRow = row; });
+    table.on("rowMouseLeave", (_e, _row) => { hoveredRow = null; });
+
+    // —— 所有快捷鍵都加「編輯中不觸發」的防呆
+    document.addEventListener("keydown", (event) => {
+      if (isEditing(event)) return;
+
+      // Enter → 切換目前 hover 行的選取
       if (event.key === "Enter" && hoveredRow) {
-        event.preventDefault(); // 阻止預設行為
+        event.preventDefault();
         hoveredRow.toggleSelect();
       }
-    });
-    
-    // ✅ [快捷鍵] Cmd/Ctrl + ↑ → 選取上一行
-    document.addEventListener("keydown", function(event) {
+
+      // Cmd/Ctrl + ↑ / ↓ → 移動選取到上一行 / 下一行
       if ((event.metaKey || event.ctrlKey) && event.key === "ArrowUp") {
-        event.preventDefault(); // 阻止預設行為
-        let selectedRows = table.getSelectedRows();
-        let allRows = table.getRows();
-        if (selectedRows.length > 0) {
-          let firstRow = selectedRows[0]; // 取得當前選中的第一行
-          let prevRow = firstRow.getPrevRow(); // 獲取上一行
-          selectedRows.forEach(row => row.deselect()); // 取消所有勾選
-          if (prevRow) prevRow.select(); // 選擇上一行
+        event.preventDefault();
+        const selectedRows = table.getSelectedRows();
+        if (selectedRows.length) {
+          const prev = selectedRows[0].getPrevRow();
+          table.deselectRow();
+          if (prev) prev.select();
         }
       }
-    });
-    
-    // ✅ [快捷鍵] Cmd/Ctrl + ↓ → 選取下一行
-    document.addEventListener("keydown", function(event) {
       if ((event.metaKey || event.ctrlKey) && event.key === "ArrowDown") {
-        event.preventDefault(); // 阻止預設行為
-        let selectedRows = table.getSelectedRows();
-        let allRows = table.getRows();
-        if (selectedRows.length > 0) {
-          let lastRow = selectedRows[selectedRows.length - 1]; // 取得當前選中的最後一行
-          let nextRow = lastRow.getNextRow(); // 獲取下一行
-          selectedRows.forEach(row => row.deselect()); // 取消所有勾選
-          if (nextRow) nextRow.select(); // 選擇下一行
+        event.preventDefault();
+        const selectedRows = table.getSelectedRows();
+        if (selectedRows.length) {
+          const next = selectedRows[selectedRows.length - 1].getNextRow();
+          table.deselectRow();
+          if (next) next.select();
         }
       }
-    });
-    
-    // ✅ [快捷鍵] Cmd/Ctrl + E → 勾選 / 取消所有列
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "e") {
-        event.preventDefault(); // 阻止預設行為
-        let allRows = table.getRows("active");
-        let selectedRows = table.getSelectedRows();
-        if (selectedRows.length > 0) {
-          table.deselectRow(allRows); // 取消全部勾選
-        } else {
-          table.selectRow(allRows); // 全部勾選
-        }
+
+      // Cmd/Ctrl + E → 全選 / 全不選（當前 active rows）
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "e") {
+        event.preventDefault();
+        const active = table.getRows("active");
+        if (table.getSelectedRows().length) table.deselectRow(active);
+        else table.selectRow(active);
       }
-    });
-    
-    // ✅ [快捷鍵] Cmd/Ctrl + F → 高亮並勾選符合條件的列（如 num_enabled_targets < 10）
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "f") {
-        event.preventDefault(); // 阻止預設行為
-        let allRows = table.getRows(); // 取得當前排序後的所有行
-        let matchingRows = []; // 存放符合條件的行資訊
-        
-        allRows.forEach(row => {
-          let data = row.getData();
-          let rowElement = row.getElement();
-          
-          if (!rowElement) return; // 確保行已載入
-          
+
+      // Cmd/Ctrl + F → 高亮並選到最上方符合條件（num_enabled_targets < 10）
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        const rows = table.getRows();
+        const matches = [];
+        rows.forEach(r => {
+          const data = r.getData();
+          const el = r.getElement();
+          if (!el) return;
           if (data.num_enabled_targets < 10) {
-            rowElement.style.backgroundColor = "rgba(255, 255, 100, 0.3)"; // 透明淡黃色
-            
-            // ✅ 取得行的當前視覺位置
-            let position = row.getPosition();
-            
-            // ✅ 只存入 position 不是 false 的行
-            if (position !== false) {
-              matchingRows.push({ row, position });
-            }
+            el.style.backgroundColor = "rgba(255,255,100,0.3)";
+            const pos = r.getPosition();
+            if (pos !== false) matches.push({ r, pos });
           } else {
-            rowElement.style.backgroundColor = ""; // 回復原色
+            el.style.backgroundColor = "";
           }
         });
-        
-        // ✅ 找到 `matchingRows` 中 `position` 最小的行
-        if (matchingRows.length > 0) {
-          let topRow = matchingRows.reduce((min, row) => row.position < min.position ? row : min, matchingRows[0]);
-          
-          // ✅ 先取消所有勾選，再勾選最上方的符合條件行
+        if (matches.length) {
+          matches.sort((a,b) => a.pos - b.pos);
           table.deselectRow();
-          topRow.row.select();
-          
-          console.log("已勾選最上方的符合條件行");
+          matches[0].r.select();
+          scrollSelectedRowToTop(table);
         }
-        
-        scrollSelectedRowToTop();
       }
-    });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "b") {
-        event.preventDefault(); // 阻止預設行為
-        let allRows = table.getRows(); // 取得當前排序後的所有行
-        
-        allRows.forEach(row => {
-          let data = row.getData();
-          let rowElement = row.getElement();
-          
-          if (!rowElement) return; // 確保行已載入
-          
-          rowElement.style.backgroundColor = ""; // 回復原色
+
+      // Cmd/Ctrl + B → 清除高亮並清空選取
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        table.getRows().forEach(r => {
+          const el = r.getElement();
+          if (el) el.style.backgroundColor = "";
         });
-        
         table.deselectRow();
       }
-    });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "d") {
-        event.preventDefault(); // 阻止預設行為
-        let selectedRows = table.getSelectedRows();
-        let links = [];
-        
-        selectedRows.forEach(row => {
-          let cell = row.getCell("product_image_url"); // 只抓這個欄位
-          if (cell) {
-            let cellElement = cell.getElement();
-            let anchorTag = cellElement.querySelector("a"); // 找到 <a> 標籤
-            if (anchorTag && anchorTag.href) {
-              links.push(anchorTag.href); // 抓取 <a> 的 href 屬性
-            }
-          }
-        });
-        
-        if (links.length > 0 && links.length <= 20) {
-          links.forEach(link => window.open(link, "_blank")); // 在新分頁開啟
-        } else if (links.length > 20) {
-          console.warn("勾選過多的超連結");
-        } else {
-          console.warn("沒有找到可用的超連結");
-        }
-      }
-    });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "k") {
-        event.preventDefault(); // 阻止預設行為
-        let selectedRows = table.getSelectedRows();
-        let links = [];
-        
-        selectedRows.forEach(row => {
-          let cell = row.getCell("num_enabled_targets"); // 只抓這個欄位
-          if (cell) {
-            let cellElement = cell.getElement();
-            let anchorTag = cellElement.querySelector("a"); // 找到 <a> 標籤
-            if (anchorTag && anchorTag.href) {
-              links.push(anchorTag.href); // 抓取 <a> 的 href 屬性
-            }
-          }
-        });
-        
-        if (links.length > 0 && links.length <= 20) {
-          links.forEach(link => window.open(link, "_blank")); // 在新分頁開啟
-        } else if (links.length > 20) {
-          console.warn("勾選過多的超連結");
-        } else {
-          console.warn("沒有找到可用的超連結");
-        }
-      }
-    });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "s") {
+
+      // Cmd/Ctrl + D → 開啟選取列的 product_image_url 欄位中的連結（<=20）
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "d") {
         event.preventDefault();
-        let filteredRows = table.getRows("active"); // 取得目前篩選後的行
-        
-        if (filteredRows.length === 0) {
-          console.warn("沒有篩選後的資料可供下載");
-          return;
-        }
-        
-        // ✅ 將篩選後的數據轉換為 JSON
-        let dataToExport = filteredRows.map(row => row.getData());
-        
-        // ✅ 下載 Excel 檔案
+        const links = [];
+        table.getSelectedRows().forEach(r => {
+          const cell = r.getCell("product_image_url");
+          const el = cell && cell.getElement();
+          const a = el && el.querySelector("a");
+          if (a && a.href) links.push(a.href);
+        });
+        if (!links.length) console.warn("沒有找到可用的超連結");
+        else if (links.length > 20) console.warn("勾選過多的超連結");
+        else links.forEach(href => window.open(href, "_blank"));
+      }
+
+      // Cmd/Ctrl + K → 開啟選取列的 num_enabled_targets 欄位中的連結（<=20）
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        const links = [];
+        table.getSelectedRows().forEach(r => {
+          const cell = r.getCell("num_enabled_targets");
+          const el = cell && cell.getElement();
+          const a = el && el.querySelector("a");
+          if (a && a.href) links.push(a.href);
+        });
+        if (!links.length) console.warn("沒有找到可用的超連結");
+        else if (links.length > 20) console.warn("勾選過多的超連結");
+        else links.forEach(href => window.open(href, "_blank"));
+      }
+
+      // Cmd/Ctrl + S → 下載「目前篩選後」的資料為 xlsx
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        const filtered = table.getRows("active");
+        if (!filtered.length) return console.warn("沒有篩選後的資料可供下載");
+        const dataToExport = filtered.map(r => r.getData());
         table.download("xlsx", "filtered_table.xlsx", {
           sheetName: "Filtered Data",
-          data: dataToExport // 只下載篩選後的資料
+          data: dataToExport,
         });
-        
-        console.log("篩選後的表格已下載");
       }
-    });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "j") {
+
+      // Cmd/Ctrl + J → 勾選所有沒有 product_image_url 的列，並以 checkBox 排序 desc
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "j") {
         event.preventDefault();
-        let allRows = table.getRows();
-        
-        allRows.forEach(row => {
-          let data = row.getData();
-          let rowElement = row.getElement();
-          
-          if (!rowElement) return; // 確保行已載入
-          
-          if (!data.product_image_url) {
-            console.log(data.ad_group_name);
-            row.select();
-          }
+        table.getRows().forEach(r => {
+          const d = r.getData();
+          if (!d.product_image_url) r.select();
         });
-        
-        if(table.getSelectedData()) {
-          table.setSort("checkBox", "desc");
-        };
-        
+        try { table.setSort("checkBox", "desc"); } catch(_) {}
       }
-    });
 
-    // Cmd/Ctrl + Q → 選取當前「頁面」的前 10 列
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "g") {
-        event.preventDefault(); // 嘗試阻止預設行為（注意 macOS 可能仍由瀏覽器接管退出）
-        const rows = table.getRows("active"); // 只取當前頁面的有效行（已考慮排序/篩選/分頁）
-        if (!rows || rows.length === 0) {
-          console.warn("當前頁面沒有可選取的列");
-          return;
-        }
-    
-        table.deselectRow(); // 清空舊選取
-        const pick = rows.slice(0, 10); // 取前 10 列（不足 10 就取全部）
-        pick.forEach(r => r.select());
-    
-        // 讓第一列可見並置頂
-        table.scrollToRow(pick[0], "top", true);
-        console.log(`已選取當前頁面的前 ${pick.length} 列`);
+      // Cmd/Ctrl + G → 勾選當前頁面前 10 列
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        const rows = table.getRows("active");
+        if (!rows || !rows.length) return console.warn("當前頁面沒有可選取的列");
+        table.deselectRow();
+        rows.slice(0, 10).forEach(r => r.select());
+        table.scrollToRow(rows[0], "top", true);
       }
-    });
 
-    // ✅ [快捷鍵] Cmd/Ctrl + 數字鍵 → 開啟表格欄位排序選單
-    
-    // ===========================================
-    // 🔧 公用函式：點擊表格欄位選單中的選項
-    // ===========================================
-    function openHeaderMenuAndClickOption(columnIndex = 0, optionIndex = 0) {
-      
-      let menuButtons = document.querySelectorAll('.tabulator-col .tabulator-header-popup-button');
-      if (menuButtons[columnIndex]) {
-        menuButtons[columnIndex].click(); // 打開選單
-        
-        setTimeout(() => {
-          let menuItems = document.querySelectorAll('.tabulator-menu-item');
-          if (menuItems[optionIndex]) {
-            menuItems[optionIndex].click(); // 點擊選單選項
-          }
-        }, 200);
-      }
-    }
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "1") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(0, 0);
+      // Cmd/Ctrl + 數字鍵 / X → 開欄位選單並點指定項目
+      const key = event.key;
+      if ((event.metaKey || event.ctrlKey) && ["1","2","3","4","5","x","X"].includes(key)) {
+        event.preventDefault();
+        const map = { "1":0, "2":1, "3":2, "4":3, "5":4, "x":5, "X":5 };
+        openHeaderMenuAndClickOption(0, map[key]);
       }
     });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "2") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(0, 1);
-      }
+  }
+
+  function installAsinPicker(table) {
+    if (document.getElementById("asin-filter-box")) return;
+
+    const box = document.createElement("div");
+    box.id = "asin-filter-box";
+    Object.assign(box.style, {
+      position: "fixed",
+      top: "10px",
+      right: "200px",
+      zIndex: 9999,
+      background: "#fff",
+      border: "1px solid #ccc",
+      padding: "10px",
+      borderRadius: "8px",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+      maxWidth: "340px",
     });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "3") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(0, 2);
-      }
-    });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "4") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(0, 3);
-      }
-    });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "5") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(0, 4);
-      }
-    });
-    
-    document.addEventListener("keydown", function(event) {
-      if ((event.metaKey || event.ctrlKey) && event.key === "x") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(0, 5);
-      }
-    });
-    
-    
-    // ✅ 複製到剪貼簿
-    
-    // ===========================================
-    // 📋 公用函式：複製文字到剪貼簿
-    // ===========================================
-    function copyToClipboard(text) {
-      
-      let textarea = document.createElement("textarea");
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-    }
-    
-    // ✅ 新增右下角的「回到最上方」與「回到最下方」按鈕
-    
-    // ===========================================
-    // 🖱️ UI 建立：右下角功能按鈕產生器
-    // ===========================================
-    function createRightDownButton(text, right, bottom, action) {
-      
-      let btn = document.createElement("button");
-      btn.innerText = text;
-      btn.style.position = "fixed";
-      btn.style.right = right;
-      btn.style.bottom = bottom;
-      btn.style.zIndex = "9999";
-      btn.style.padding = "10px 15px";
-      btn.style.background = "rgba(0, 0, 0, 0.7)";
-      btn.style.color = "white";
-      btn.style.border = "none";
-      btn.style.borderRadius = "5px";
-      btn.style.cursor = "pointer";
-      btn.style.fontSize = "14px";
-      btn.addEventListener("mouseenter", () => btn.style.background = "black");
-      btn.addEventListener("mouseleave", () => btn.style.background = "rgba(0, 0, 0, 0.7)");
-      btn.addEventListener("click", action);
-      document.body.appendChild(btn);
-    }
-    
-    
-    // 「回到最上方」按鈕
-    createRightDownButton("E", "100px", "120px", expandAllGroups);
-    // 「回到最上方」按鈕
-    createRightDownButton("C", "100px", "60px", collapseAllGroups);
-    
-    // 「回到最上方」按鈕
-    createRightDownButton("⬆", "50px", "120px", () => window.scrollTo({ top: 0, behavior: "smooth" }));
-    // 「回到最下方」按鈕
-    createRightDownButton("⬇", "50px", "60px", () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }));
-    
-    function collapseAllGroups() {
-      let groupCount = table.getGroups().length;
-      for (let i = 0; i < groupCount; i++) {
-        table.getGroups()[i].hide();
-      }
-    };
-    
-    function expandAllGroups() {
-      let groupCount = table.getGroups().length;
-      for (let i = 0; i < groupCount; i++) {
-        table.getGroups()[i].show();
-      }
-    };
-    
-    
-    // ===========================================
-    // 🧭 輔助功能：將選取的行滾動到頁面頂部
-    // ===========================================
-    function scrollSelectedRowToTop() {
-      
-      let selectedRows = table.getSelectedRows();
-      
-      if (selectedRows.length === 0) {
-        console.warn("沒有選擇任何行，無法滾動");
-        return;
-      }
-      
-      let firstRow = selectedRows[0]; // 取得第一個被勾選的行
-      
-      // ✅ 1. 讓 Tabulator 內部滾動到該行，確保它被載入
-      table.scrollToRow(firstRow, "top", false).then(() => {
-        console.log("已將表格滾動到該行");
-        
-        // ✅ 2. 取得該行的 DOM 元素
-        let rowElement = firstRow.getElement();
-        if (!rowElement) {
-          console.warn("仍無法找到行的 DOM 元素，可能是虛擬 DOM 尚未渲染");
-          return;
-        }
-        
-        // ✅ 3. 讓 Tabulator 內部滾動條精確滾動，使該行置頂
-        let tableContainer = table.element; // Tabulator 容器
-        let rowOffset = rowElement.offsetTop; // 計算行的位置
-        tableContainer.scrollTop = rowOffset;
-        
-        console.log("Tabulator 內部滾動成功");
-        
-        // ✅ 4. 讓網頁主滾動條同步調整
-        let tableTopOffset = tableContainer.getBoundingClientRect().top + window.scrollY;
-        let targetScrollY = rowOffset + tableTopOffset;
-        window.scrollTo({ top: targetScrollY, behavior: "smooth" });
-        
-        console.log("已將頁面滾動到該行");
-      }).catch(() => {
-        console.warn("表格滾動失敗，可能是虛擬 DOM 限制");
-      });
-    }
-    
-    if (document.getElementById("asin-filter-box")) return; // 避免重複插入
-    
-    // 建立輸入區塊
-    const container = document.createElement("div");
-    container.id = "asin-filter-box";
-    container.style.position = "fixed";
-    container.style.top = "10px";
-    container.style.right = "200px";
-    container.style.zIndex = 9999;
-    container.style.background = "#fff";
-    container.style.border = "1px solid #ccc";
-    container.style.padding = "10px";
-    container.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
-    container.style.borderRadius = "8px";
-    container.innerHTML = `
-    <textarea id="asin-input" rows="5" style="width: 200px;" placeholder="貼上 ASIN，一行一個"></textarea>
-    <br>
-    <button id="apply-asin-filter">勾選符合 ASIN</button>
+    box.innerHTML = `
+      <div style="font-weight:700; margin-bottom:6px;">勾選符合 ASIN</div>
+      <textarea id="asin-input" rows="3" style="width:320px; font-family:monospace;" placeholder="以逗號或換行分隔，如：B0XXXXX1, B0XXXXX2"></textarea>
+      <div style="margin-top:6px; display:flex; gap:8px;">
+        <button id="apply-asin-filter" class="agp-mini-btn" style="position:static;padding:6px 10px;">套用</button>
+        <button id="asin-clear" class="agp-mini-btn" style="position:static;padding:6px 10px;background:#666;">清除選取</button>
+      </div>
     `;
-    document.body.appendChild(container);
-    
-    // 處理按鈕點擊
+    document.body.appendChild(box);
+
+    const parseList = (txt) =>
+      txt
+        .split(/[\s,]+/)
+        .map(s => s.trim().toUpperCase().replace(/^"|"$/g, ""))
+        .filter(Boolean);
+
     document.getElementById("apply-asin-filter").addEventListener("click", () => {
-      const asinText = document.getElementById("asin-input").value.trim();
-      if (!asinText) return;
-      
-      const asinList = asinText
-      .split(/[\s,]+/)
-      .map(a => a.trim().toUpperCase().replace(/^"|"$/g, ''))
-      .filter(a => a); // 清除空白
-      
-      console.log(asinList);
-      
+      const txt = (document.getElementById("asin-input").value || "").trim();
+      if (!txt) return;
+      const list = parseList(txt);
+
       const rows = table.getRows();
-      
-      table.deselectRow(); // 清除舊的勾選
-      
-      let matchedCount = 0;
-      
+      table.deselectRow();
+      let matched = 0;
+
       rows.forEach(row => {
         const data = row.getData();
-        const rowElement = row.getElement();
-        
+        const rowEl = row.getElement();
+        // 以 ad_group_name 為主；若空，嘗試從 DOM 中 a[href*="asin:"] 的文字
         let asin = (data.ad_group_name || "").toUpperCase();
-        if (!asin && rowElement) {
-          asin = rowElement.querySelector('a[href*="asin:"]')?.textContent?.trim().toUpperCase() || "";
+        if (!asin && rowEl) {
+          const a = rowEl.querySelector('a[href*="asin:"]');
+          asin = (a && a.textContent && a.textContent.trim().toUpperCase()) || "";
         }
-        
-        if (asinList.includes(asin)) {
-          matchedCount++;
+        if (list.includes(asin)) {
+          matched++;
           row.select();
         }
       });
-      
-      table.setSort("checkBox", "desc");
-      
-      scrollSelectedRowToTop();
-      
-      console.log(`共勾選 ${matchedCount} 筆 ASIN 符合的資料`);
+
+      try { table.setSort("checkBox", "desc"); } catch(_) {}
+      scrollSelectedRowToTop(table);
+      console.log(`共勾選 ${matched} 筆 ASIN 符合的資料`);
     });
-    
-    console.log("Tampermonkey Script Loaded: Tabulator Enhancements Activated!");
+
+    document.getElementById("asin-clear").addEventListener("click", () => {
+      table.deselectRow();
+    });
   }
-  
-  let checkTabulator = setInterval(() => {
-    if (typeof Tabulator !== "undefined" && Tabulator.findTable("#ad-groups-table").length > 0) {
-      clearInterval(checkTabulator);
-      initTableEnhancements();
-    }
-  }, 500);
+
+  /** =========================
+   *  Bootstrap
+   *  ========================= */
+  document.addEventListener("DOMContentLoaded", () => waitForTableAndInit());
+  waitForTableAndInit(0);
+  observeForTable();
 })();
