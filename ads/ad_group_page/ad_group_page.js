@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additional Functions (stable merge)
 // @namespace    http://tampermonkey.net/
-// @version      2025.09.05.2
+// @version      2025.09.05.3
 // @description  Keep all your features + safer init, CSS classes, keybind guards, and small UX fixes for Tabulator on the ad group page.
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250905
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250905
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025090503
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025090503
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -77,22 +77,53 @@
     style.textContent = `
       .tmk-row-hover { outline: 3px solid red !important; outline-offset: -2px; }
       .tmk-row-selected { outline: 3px solid white !important; outline-offset: -2px; }
-
-      #${COUNTER_ID}{
+    
+      /* 右上角資訊卡容器（可互動） */
+      #selection-panel{
         position: fixed;
         top: 10px;
         right: 80px;
         z-index: 9999;
-        padding: 8px 15px;
-        background: rgba(0,0,0,.7);
+        padding: 8px 12px;
+        background: rgba(0,0,0,.72);
         color: #fff;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 700;
-        pointer-events: none;
+        border-radius: 10px;
+        font-size: 13px;
+        font-weight: 600;
         box-shadow: 0 4px 14px rgba(0,0,0,.25);
+        -webkit-backdrop-filter: blur(2px);
+        backdrop-filter: blur(2px);
+        pointer-events: auto; /* 允許輸入框互動 */
       }
-
+      #selection-counter{
+        margin: 0 0 6px 0;
+      }
+      #gcount-wrap{
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      #gcount-wrap label{
+        font-size: 12px;
+        opacity: .85;
+        white-space: nowrap;
+      }
+      #gcount-input{
+        width: 64px;
+        height: 24px;
+        border-radius: 6px;
+        border: 1px solid rgba(255,255,255,.25);
+        background: rgba(255,255,255,.1);
+        color: #fff;
+        padding: 0 6px;
+        font-size: 12px;
+        outline: none;
+      }
+      #gcount-input:focus{
+        border-color: rgba(255,255,255,.5);
+        background: rgba(255,255,255,.18);
+      }
+    
       .agp-mini-btn{
         position: fixed;
         z-index: 9999;
@@ -106,6 +137,7 @@
       }
       .agp-mini-btn:hover{ background: #000; }
     `;
+
     document.head.appendChild(style);
   };
 
@@ -205,16 +237,26 @@
   }
 
   function attachSelectionCounter(table) {
-    let counter = document.getElementById(COUNTER_ID);
-    if (!counter) {
-      counter = document.createElement("div");
-      counter.id = COUNTER_ID;
-      counter.textContent = "已選擇 0 列";
-      document.body.appendChild(counter);
+    // 容器（含：計數文字 + G 選取數輸入框）
+    let panel = document.getElementById("selection-panel");
+    if (!panel) {
+      panel = document.createElement("div");
+      panel.id = "selection-panel";
+      panel.innerHTML = `
+        <div id="selection-counter">已選擇 0 列</div>
+        <div id="gcount-wrap">
+          <label for="gcount-input">Cmd+G 勾選數：</label>
+          <input id="gcount-input" type="number" min="1" step="1" value="10" />
+        </div>
+      `;
+      document.body.appendChild(panel);
     }
+  
+    const counterEl = panel.querySelector("#selection-counter");
     const update = () => {
-      counter.textContent = `已選擇 ${table.getSelectedRows().length} 列`;
+      counterEl.textContent = `已選擇 ${table.getSelectedRows().length} 列`;
     };
+  
     table.on("rowSelectionChanged", update);
     update();
   }
@@ -411,13 +453,22 @@
         try { table.setSort("checkBox", "desc"); } catch(_) {}
       }
 
-      // Cmd/Ctrl + G → 勾選當前頁面前 10 列
+      // Cmd/Ctrl + G → 勾選當前頁面前 N 列（由輸入框決定，預設 10）
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "g") {
         event.preventDefault();
         const rows = table.getRows("active");
         if (!rows || !rows.length) return console.warn("當前頁面沒有可選取的列");
+      
+        // 讀取輸入框的值
+        const inputEl = document.getElementById("gcount-input");
+        let N = 10;
+        if (inputEl) {
+          const v = parseInt(inputEl.value, 10);
+          if (Number.isFinite(v) && v > 0) N = v;
+        }
+      
         table.deselectRow();
-        rows.slice(0, 10).forEach(r => r.select());
+        rows.slice(0, N).forEach(r => r.select());
         table.scrollToRow(rows[0], "top", true);
       }
 
