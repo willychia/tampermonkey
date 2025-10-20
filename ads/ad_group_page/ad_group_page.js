@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additional Functions (stable merge)
 // @namespace    http://tampermonkey.net/
-// @version      2025.09.15
+// @version      2025.10.20
 // @description  Keep all your features + safer init, CSS classes, keybind guards, and small UX fixes for Tabulator on the ad group page.
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250915
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20250915
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251020
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251020
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -491,7 +491,7 @@
       const key = event.key;
       if ((event.metaKey || event.ctrlKey) && ["1","2","3","4","5","x","X"].includes(key)) {
         event.preventDefault();
-        const map = { "1":0, "2":1, "3":2, "4":3, "5":4, "x":5, "X":5 };
+        const map = { "1":0, "2":1, "3":2, "4":3, "5":4, "x":6, "X":6 };
         openHeaderMenuAndClickOption(0, map[key]);
       }
     });
