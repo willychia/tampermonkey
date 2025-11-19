@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additional Functions (stable merge)
 // @namespace    http://tampermonkey.net/
-// @version      2025.10.20
+// @version      2025.11.19
 // @description  Keep all your features + safer init, CSS classes, keybind guards, and small UX fixes for Tabulator on the ad group page.
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251020
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251020
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251119
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251119
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -425,21 +425,6 @@
           const el = cell && cell.getElement();
           const a = el && el.querySelector("img");
           if (a && a.src) links.push('https://www.amazon.com/stylesnap?q=' + a.src);
-        });
-        if (!links.length) console.warn("沒有找到可用的超連結");
-        else if (links.length > 20) console.warn("勾選過多的超連結");
-        else links.forEach(href => window.open(href, "_blank"));
-      }
-
-      // Cmd/Ctrl + K → 開啟選取列的 num_enabled_targets 欄位中的連結（<=20）
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        const links = [];
-        table.getSelectedRows().forEach(r => {
-          const cell = r.getCell("num_enabled_targets");
-          const el = cell && cell.getElement();
-          const a = el && el.querySelector("a");
-          if (a && a.href) links.push(a.href);
         });
         if (!links.length) console.warn("沒有找到可用的超連結");
         else if (links.length > 20) console.warn("勾選過多的超連結");
