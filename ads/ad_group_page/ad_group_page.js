@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additional Functions (stable merge)
 // @namespace    http://tampermonkey.net/
-// @version      2025.11.19
+// @version      2025.11.25
 // @description  Keep all your features + safer init, CSS classes, keybind guards, and small UX fixes for Tabulator on the ad group page.
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251119
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251119
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251125
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251125
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -164,7 +164,7 @@
       enhanceColumns(table);
 
       // —— 3) 滑鼠 hover / 勾選外框（改為 class，避免重繪洗掉）
-      installRowHighlight(table);
+      // installRowHighlight(table);
 
       // —— 4) 右上角勾選列數
       attachSelectionCounter(table);
@@ -187,7 +187,7 @@
   function enhanceColumns(table) {
     const original = table.getColumnDefinitions() || [];
     const cols = original.map(col => {
-      if (col.field === "num_enabled_targets" || col.field === "stock_on_hand") {
+      if (col.field === "num_enabled_targets") {
         return {
           ...col,
           headerFilter: "number",
@@ -272,17 +272,7 @@
       b.addEventListener("click", action);
       document.body.appendChild(b);
     };
-    const collapseAllGroups = () => {
-      const groups = table.getGroups() || [];
-      for (let i = 0; i < groups.length; i++) groups[i].hide();
-    };
-    const expandAllGroups = () => {
-      const groups = table.getGroups() || [];
-      for (let i = 0; i < groups.length; i++) groups[i].show();
-    };
 
-    mkBtn("E", "100px", "120px", expandAllGroups, "Expand groups");
-    mkBtn("C", "100px", "60px",  collapseAllGroups, "Collapse groups");
     mkBtn("⬆", "50px",  "120px", () => window.scrollTo({ top: 0, behavior: "smooth" }), "Scroll to top");
     mkBtn("⬇", "50px",  "60px",  () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }), "Scroll to bottom");
   }
@@ -366,38 +356,9 @@
         else table.selectRow(active);
       }
 
-      // Cmd/Ctrl + F → 高亮並選到最上方符合條件（num_enabled_targets < 10）
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        const rows = table.getRows();
-        const matches = [];
-        rows.forEach(r => {
-          const data = r.getData();
-          const el = r.getElement();
-          if (!el) return;
-          if (data.num_enabled_targets < 10) {
-            el.style.backgroundColor = "rgba(255,255,100,0.3)";
-            const pos = r.getPosition();
-            if (pos !== false) matches.push({ r, pos });
-          } else {
-            el.style.backgroundColor = "";
-          }
-        });
-        if (matches.length) {
-          matches.sort((a,b) => a.pos - b.pos);
-          table.deselectRow();
-          matches[0].r.select();
-          scrollSelectedRowToTop(table);
-        }
-      }
-
-      // Cmd/Ctrl + B → 清除高亮並清空選取
+      // Cmd/Ctrl + B → 清空選取
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
         event.preventDefault();
-        table.getRows().forEach(r => {
-          const el = r.getElement();
-          if (el) el.style.backgroundColor = "";
-        });
         table.deselectRow();
       }
 
@@ -429,28 +390,6 @@
         if (!links.length) console.warn("沒有找到可用的超連結");
         else if (links.length > 20) console.warn("勾選過多的超連結");
         else links.forEach(href => window.open(href, "_blank"));
-      }
-
-      // Cmd/Ctrl + S → 下載「目前篩選後」的資料為 xlsx
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
-        event.preventDefault();
-        const filtered = table.getRows("active");
-        if (!filtered.length) return console.warn("沒有篩選後的資料可供下載");
-        const dataToExport = filtered.map(r => r.getData());
-        table.download("xlsx", "filtered_table.xlsx", {
-          sheetName: "Filtered Data",
-          data: dataToExport,
-        });
-      }
-
-      // Cmd/Ctrl + J → 勾選所有沒有 product_image_url 的列，並以 checkBox 排序 desc
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "j") {
-        event.preventDefault();
-        table.getRows().forEach(r => {
-          const d = r.getData();
-          if (!d.product_image_url) r.select();
-        });
-        try { table.setSort("checkBox", "desc"); } catch(_) {}
       }
 
       // Cmd/Ctrl + G → 勾選當前頁面前 N 列（由輸入框決定，預設 10）
