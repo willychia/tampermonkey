@@ -211,6 +211,18 @@
           },
         };
       }
+      if (col.field === "category") {
+        return {
+          ...col,
+          headerFilter: "select",
+          headerFilterParams: function (column) {
+            return buildSelectOptionsSortedByCount(column, {
+              includeEmpty: false,
+              showCount: true
+            });
+          },
+        };
+      }
       return col;
     });
     table.setColumns(cols);
@@ -486,6 +498,55 @@
     document.getElementById("asin-clear").addEventListener("click", () => {
       table.deselectRow();
     });
+  }
+
+  // 建一個小工具：把某欄位的 unique 值依「出現次數」降序排序
+  function buildSelectOptionsSortedByCount(column, options = {}) {
+    const {
+      includeEmpty = false,   // 要不要保留空值
+      showCount = false,      // 下拉選單的文字要不要顯示次數
+      emptyLabel = "(All)"    // 空值顯示文字
+    } = options;
+  
+    const countMap = new Map();
+  
+    // 統計每個值的出現次數
+    column.getCells().forEach(cell => {
+      let v = cell.getValue();
+  
+      // 視需求決定要不要跳過 null / 空字串
+      if (v === null || v === undefined || v === "") {
+        if (!includeEmpty) return;
+        v = ""; // 一律當成空字串 key
+      }
+  
+      countMap.set(v, (countMap.get(v) || 0) + 1);
+    });
+  
+    // 轉成陣列，方便排序： [value, count]
+    const entries = Array.from(countMap.entries());
+  
+    // 依「次數」降序排序；次數一樣用 value 字母順序
+    entries.sort((a, b) => {
+      const countDiff = b[1] - a[1]; // 降序
+      if (countDiff !== 0) return countDiff;
+      return String(a[0]).localeCompare(String(b[0]));
+    });
+  
+    // 組成 Tabulator 需要的 { value: label } 物件
+    const result = {};
+  
+    for (const [value, count] of entries) {
+      if (value === "" && includeEmpty) {
+        result[""] = emptyLabel;
+      } else {
+        result[value] = showCount
+          ? `${value} (${count})`  // 例如：Roman (123)
+          : value;                 // 只顯示文字
+      }
+    }
+  
+    return result;
   }
 
   /** =========================
