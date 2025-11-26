@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         Ad Group Page Additional Functions (stable merge)
 // @namespace    http://tampermonkey.net/
-// @version      2025.11.26.03
+// @version      2025.11.25
 // @description  Keep all your features + safer init, CSS classes, keybind guards, and small UX fixes for Tabulator on the ad group page.
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025112603
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=2025112603
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251125
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.js?v=20251125
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==
@@ -183,74 +183,38 @@
       console.error("[Ad Group Page] init error:", err);
     }
   }
-  
-  const COUNT_SORTED_SELECT_FIELDS = [
-    "category",
-    // "brand",
-    // "campaign",
-    // 之後如果要讓 vendor 也吃「依出現次數排序」就加 "vendor"
-  ];
 
   function enhanceColumns(table) {
-    // 開 live filter（輸入時立即篩選）
-    try {
-      table.updateOption({ headerFilterLiveFilter: true });
-    } catch (_) {}
-
-    // 1) num_enabled_targets：<= 數字
-    const numTargetsCol = table.getColumn("num_enabled_targets");
-    if (numTargetsCol) {
-      numTargetsCol.updateDefinition({
-        headerFilter: "number",
-        headerFilterFunc: "<=",
-        headerFilterPlaceholder: "Less than",
-      });
-    }
-
-    // 2) last_buy_box_timestamp：距今「小時數」篩選
-    const lastBbCol = table.getColumn("last_buy_box_timestamp");
-    if (lastBbCol) {
-      lastBbCol.updateDefinition({
-        headerFilter: "number",
-        headerFilterPlaceholder: "Hours within",
-        headerFilterFunc: (filterValue, cellValue) => {
-          const v = parseFloat(filterValue);
-          if (!Number.isFinite(v)) return true; // 空/非數字 → 不過濾
-          if (!cellValue) return false;
-
-          const t = new Date(cellValue);
-          if (Number.isNaN(t.getTime())) return false;
-
-          const hours = (Date.now() - t.getTime()) / 36e5;
-          return hours <= v;
-        },
-      });
-    }
-
-    // 3) 指定欄位：用「依出現次數降序」的 select 選單
-    COUNT_SORTED_SELECT_FIELDS.forEach((field) => {
-      const col = table.getColumn(field);
-      if (!col) return;
-
-      const def = col.getDefinition(); // 先抓原本定義，避免蓋掉原本有設 headerFilter 的型態
-
-      col.updateDefinition({
-        // 如果原本就有 headerFilter（例如系統設了 "select"），就沿用；沒有就用 select
-        headerFilter: def.headerFilter || "select",
-        headerFilterParams: function (column) {
-          return buildSelectOptionsSortedByCount(column, {
-            includeEmpty: false, // 不把空值放進選單
-            showCount: false,    // 如果想看到 "xxx (123)" 就改成 true
-            emptyLabel: "(All)",
-          });
-        },
-      });
+    const original = table.getColumnDefinitions() || [];
+    const cols = original.map(col => {
+      if (col.field === "num_enabled_targets") {
+        return {
+          ...col,
+          headerFilter: "number",
+          headerFilterFunc: "<=",
+          headerFilterPlaceholder: "Less than",
+        };
+      }
+      if (col.field === "last_buy_box_timestamp") {
+        return {
+          ...col,
+          headerFilter: "number",
+          headerFilterPlaceholder: "Hours within",
+          headerFilterFunc: (filterValue, cellValue) => {
+            const v = parseFloat(filterValue);
+            if (!Number.isFinite(v)) return true;     // 空/非數字 → 不過濾
+            if (!cellValue) return false;
+            const t = new Date(cellValue);
+            if (Number.isNaN(t.getTime())) return false;
+            const hours = (Date.now() - t.getTime()) / 36e5;
+            return hours <= v;
+          },
+        };
+      }
+      return col;
     });
-
-    // 重新繪製 header，讓新的 filter 設定生效
-    try {
-      table.redraw(true);
-    } catch (_) {}
+    table.setColumns(cols);
+    try { table.updateOption({ headerFilterLiveFilter: true }); } catch(_) {}
   }
 
   function installRowHighlight(table) {
@@ -522,55 +486,6 @@
     document.getElementById("asin-clear").addEventListener("click", () => {
       table.deselectRow();
     });
-  }
-
-  // 建一個小工具：把某欄位的 unique 值依「出現次數」降序排序
-  function buildSelectOptionsSortedByCount(column, options = {}) {
-    const {
-      includeEmpty = false,   // 要不要保留空值
-      showCount = false,      // 下拉選單的文字要不要顯示次數
-      emptyLabel = "(All)"    // 空值顯示文字
-    } = options;
-  
-    const countMap = new Map();
-  
-    // 統計每個值的出現次數
-    column.getCells().forEach(cell => {
-      let v = cell.getValue();
-  
-      // 視需求決定要不要跳過 null / 空字串
-      if (v === null || v === undefined || v === "") {
-        if (!includeEmpty) return;
-        v = ""; // 一律當成空字串 key
-      }
-  
-      countMap.set(v, (countMap.get(v) || 0) + 1);
-    });
-  
-    // 轉成陣列，方便排序： [value, count]
-    const entries = Array.from(countMap.entries());
-  
-    // 依「次數」降序排序；次數一樣用 value 字母順序
-    entries.sort((a, b) => {
-      const countDiff = b[1] - a[1]; // 降序
-      if (countDiff !== 0) return countDiff;
-      return String(a[0]).localeCompare(String(b[0]));
-    });
-  
-    // 組成 Tabulator 需要的 { value: label } 物件
-    const result = {};
-  
-    for (const [value, count] of entries) {
-      if (value === "" && includeEmpty) {
-        result[""] = emptyLabel;
-      } else {
-        result[value] = showCount
-          ? `${value} (${count})`  // 例如：Roman (123)
-          : value;                 // 只顯示文字
-      }
-    }
-  
-    return result;
   }
 
   /** =========================
