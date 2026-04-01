@@ -317,7 +317,7 @@
         if (observerStarted) return;
         observerStarted = true;
 
-        utils.startInitObserver(init);
+        utils.startInitObserver(SELECTOR, init);
     }
 
     startInitObserver();

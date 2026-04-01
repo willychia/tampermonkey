@@ -32,6 +32,18 @@
         return window.Tabulator.findTable(SELECTOR)[0] || null;
     };
 
+    const nodeTouchesSelector = (node) => {
+        if (!(node instanceof Element)) return false;
+        return node.matches(SELECTOR) || Boolean(node.querySelector(SELECTOR));
+    };
+
+    function mutationsTouchTable(mutations) {
+        return mutations.some((mutation) => {
+            if (nodeTouchesSelector(mutation.target)) return true;
+            return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => nodeTouchesSelector(node));
+        });
+    }
+
     const injectCSS = () => {
         if (document.getElementById("agp-v8-css")) return;
         const s = document.createElement("style");
@@ -255,8 +267,20 @@
         if (observerStarted) return;
         observerStarted = true;
 
-        const observer = new MutationObserver(() => {
-            initEnhancements();
+        let scheduled = false;
+        const scheduleInit = () => {
+            if (scheduled) return;
+            scheduled = true;
+            requestAnimationFrame(() => {
+                scheduled = false;
+                initEnhancements();
+            });
+        };
+
+        const observer = new MutationObserver((mutations) => {
+            if (mutationsTouchTable(mutations)) {
+                scheduleInit();
+            }
         });
 
         const startObserving = () => {
@@ -265,7 +289,7 @@
                 return;
             }
             observer.observe(document.body, { childList: true, subtree: true });
-            initEnhancements();
+            scheduleInit();
         };
 
         startObserving();

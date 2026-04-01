@@ -94,9 +94,34 @@
         }
     }
 
-    function startInitObserver(init) {
-        const observer = new MutationObserver(() => {
-            init();
+    function nodeTouchesSelector(node, selector) {
+        if (!(node instanceof Element)) return false;
+        return node.matches(selector) || Boolean(node.querySelector(selector));
+    }
+
+    function mutationsTouchSelector(mutations, selector) {
+        return mutations.some((mutation) => {
+            if (nodeTouchesSelector(mutation.target, selector)) return true;
+            return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => nodeTouchesSelector(node, selector));
+        });
+    }
+
+    function startInitObserver(selector, init) {
+        let scheduled = false;
+
+        const scheduleInit = () => {
+            if (scheduled) return;
+            scheduled = true;
+            requestAnimationFrame(() => {
+                scheduled = false;
+                init();
+            });
+        };
+
+        const observer = new MutationObserver((mutations) => {
+            if (mutationsTouchSelector(mutations, selector)) {
+                scheduleInit();
+            }
         });
 
         const startObserving = () => {
@@ -105,7 +130,7 @@
                 return;
             }
             observer.observe(document.body, { childList: true, subtree: true });
-            init();
+            scheduleInit();
         };
 
         startObserving();
@@ -118,7 +143,6 @@
         ensureCounter,
         getTableBySelector,
         isEditingEvent,
-        sameRow,
         scrollFirstSelectedToTop,
         sortByField,
         startInitObserver,
