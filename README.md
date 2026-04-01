@@ -13,9 +13,16 @@ Tampermonkey scripts for Hourloop Amazon Ads admin pages.
 - `ads/shared/tabulator_page_utils.js`
   Shared helper utilities used by the Tabulator-based page scripts.
 
+## Install Links
+
+- Product Targeting: `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.user.js`
+- Keyword Targeting: `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/keyword_targeting_page/keyword_targeting_page.user.js`
+- Ad Group: `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.user.js`
+
 ## Maintenance Notes
 
 - Each script is standalone so it can be installed independently in Tampermonkey.
+- Use the `.user.js` links above for new installs so Tampermonkey recognizes them as installable userscripts.
 - Product and keyword pages share a common helper via Tampermonkey `@require`.
 - The pages rely on Tabulator tables rendered inside the Hourloop admin.
 - Page-specific documentation is stored beside each script.
