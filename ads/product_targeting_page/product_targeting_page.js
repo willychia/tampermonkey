@@ -1,384 +1,358 @@
 // ==UserScript==
-// @name         Product Targeting Page Additional Function
+// @name         Product Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2025-05-29.1
-// @description  Add enhanced features to Tabulator table, using tabulator
+// @version      2026.03.13.5
+// @description  Product Targeting 加強版：Cmd+A 自動調價、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
 // @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
-// @grant        none
+// @grant        GM_addStyle
 // ==/UserScript==
 
 (function() {
-  'use strict';
+    'use strict';
 
-  function initTableEnhancements() {
-    var table = Tabulator.findTable("#targets-table")[0];
-    if (!table) return;
+    // 1. 注入 UI 樣式
+    GM_addStyle(`
+        .hover-highlight { border: 3px solid red !important; }
+        .selected-highlight { border: 3px solid yellow !important; }
+        #selection-counter {
+            position: fixed; top: 10px; right: 80px; z-index: 9999;
+            padding: 8px 15px; background: rgba(0, 0, 0, 0.7);
+            color: white; border-radius: 5px; font-size: 14px; font-weight: bold; pointer-events: none;
+        }
+        .custom-float-btn {
+            position: fixed; z-index: 9999; padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.7); color: white; border: none;
+            border-radius: 5px; cursor: pointer; font-size: 14px;
+        }
+        .custom-float-btn:hover { background: black; }
+        #asin-filter-box {
+            position: fixed; top: 10px; right: 200px; z-index: 9999;
+            background: #fff; border: 1px solid #ccc; padding: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); border-radius: 8px;
+        }
+    `);
 
-    let hoveredRow = null; // 記錄當前 Hover 的行
+    let table, hoveredRow = null, counterDiv;
 
-    // ✅ 1. 當 Hover 列時，外框變成粗紅色
-    table.on("rowMouseEnter", function(e, row) {
-      hoveredRow = row;
-      let rowElement = row.getElement();
-      rowElement.style.border = "3px solid red";
-    });
+    // 防衝突判斷
+    const isEditing = (ev) => {
+        const el = ev.target;
+        if (!el) return false;
+        const tag = (el.tagName || "").toLowerCase();
+        return el.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
+    };
 
-    // 當滑鼠離開時，恢復原來的邊框
-    table.on("rowMouseLeave", function(e, row) {
-      let rowElement = row.getElement();
-      rowElement.style.border = row.isSelected() ? "3px solid yellow" : "";
-      hoveredRow = null;
-    });
+    function init() {
+        table = Tabulator.findTable("#targets-table")[0];
+        if (!table) return;
 
-    // ✅ 2. 當列被勾選時，外框變成粗黃色
-    table.on("rowSelected", function(row) {
-      row.getElement().style.border = "3px solid yellow";
-    });
-
-    table.on("rowDeselected", function(row) {
-      row.getElement().style.border = "";
-    });
-
-    // ✅ 1. 創建右上角的顯示框
-    let counterDiv = document.createElement("div");
-    counterDiv.id = "selection-counter";
-    counterDiv.style.position = "fixed";
-    counterDiv.style.top = "10px";
-    counterDiv.style.right = "80px";
-    counterDiv.style.zIndex = "9999";
-    counterDiv.style.padding = "8px 15px";
-    counterDiv.style.background = "rgba(0, 0, 0, 0.7)";
-    counterDiv.style.color = "white";
-    counterDiv.style.borderRadius = "5px";
-    counterDiv.style.fontSize = "14px";
-    counterDiv.style.fontWeight = "bold";
-    counterDiv.innerText = "已選擇 0 列";
-
-    document.body.appendChild(counterDiv);
-
-    // ✅ 2. 更新顯示數字
-    function updateSelectionCounter() {
-      let selectedCount = table.getSelectedRows().length;
-      counterDiv.innerText = `已選擇 ${selectedCount} 列`;
+        setupColumns();
+        setupUI();
+        setupEvents();
+        console.log("Product Targeting Enhancements Activated!");
     }
 
-    // ✅ 3. 監聽勾選變更
-    table.on("rowSelected", updateSelectionCounter);
-    table.on("rowDeselected", updateSelectionCounter);
+    function setupColumns() {
+        const columns = table.getColumnDefinitions();
+        if (columns.length > 0) columns[0].field = "checkBox";
 
-    console.log("勾選計數器已啟動");
+        const enhancedCols = columns.map((col) => {
+            if (col.field === "stock_on_hand") {
+                return {
+                    ...col,
+                    headerFilter: "number",
+                    headerFilterFunc: "<=",
+                    headerFilterPlaceholder: "Less than"
+                };
+            }
+            if (col.field === "last_buy_box_timestamp") {
+                return {
+                    ...col,
+                    headerFilter: "number",
+                    headerFilterPlaceholder: "Hours within",
+                    headerFilterFunc: (filterValue, cellValue) => {
+                        const v = parseFloat(filterValue);
+                        if (!Number.isFinite(v) || !cellValue) return true;
+                        const hours = (Date.now() - new Date(cellValue).getTime()) / 36e5;
+                        return hours <= v;
+                    }
+                };
+            }
+            return col;
+        });
 
-    // ✅ 3. 當 Hover 列且按下 Enter 時，該列勾選/取消勾選
-    document.addEventListener("keydown", function(event) {
-      if (event.key === "Enter" && hoveredRow) {
-        event.preventDefault(); // 阻止預設行為
-        hoveredRow.toggleSelect();
-      }
-    });
+        table.setColumns(enhancedCols);
+    }
 
-    // ✅ 4. Cmd + 上方向鍵：取消當前勾選並改選上一列
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "ArrowUp") {
-        event.preventDefault(); // 阻止預設行為
-        let selectedRows = table.getSelectedRows();
-        let allRows = table.getRows();
-        if (selectedRows.length > 0) {
-          let firstRow = selectedRows[0]; // 取得當前選中的第一行
-          let prevRow = firstRow.getPrevRow(); // 獲取上一行
-          selectedRows.forEach(row => row.deselect()); // 取消所有勾選
-          if (prevRow) prevRow.select(); // 選擇上一行
+    function setupUI() {
+        counterDiv = document.createElement("div");
+        counterDiv.id = "selection-counter";
+        counterDiv.innerText = "已選擇 0 列";
+        document.body.appendChild(counterDiv);
+
+        const buttons = [
+            { t: "E", r: "100px", b: "120px", a: () => table.getGroups().forEach((g) => g.show()) },
+            { t: "C", r: "100px", b: "60px", a: () => table.getGroups().forEach((g) => g.hide()) },
+            { t: "⬆", r: "50px", b: "120px", a: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
+            { t: "⬇", r: "50px", b: "60px", a: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }) }
+        ];
+
+        buttons.forEach((btn) => {
+            const el = document.createElement("button");
+            el.className = "custom-float-btn";
+            el.innerText = btn.t;
+            el.style.right = btn.r;
+            el.style.bottom = btn.b;
+            el.onclick = btn.a;
+            document.body.appendChild(el);
+        });
+
+        if (!document.getElementById("asin-filter-box")) {
+            const container = document.createElement("div");
+            container.id = "asin-filter-box";
+            container.innerHTML = `
+                <textarea id="asin-input" rows="5" style="width: 200px; display: block; margin-bottom: 5px;" placeholder="貼上 ASIN，一行一個"></textarea>
+                <button id="apply-asin-filter" style="width: 100%; cursor: pointer;">勾選符合 ASIN</button>
+            `;
+            document.body.appendChild(container);
+            document.getElementById("apply-asin-filter").onclick = applyAsinFilter;
         }
-      }
-    });
+    }
 
-    // ✅ 5. Cmd + 下方向鍵：取消當前勾選並改選下一列
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "ArrowDown") {
-        event.preventDefault(); // 阻止預設行為
-        let selectedRows = table.getSelectedRows();
-        let allRows = table.getRows();
-        if (selectedRows.length > 0) {
-          let lastRow = selectedRows[selectedRows.length - 1]; // 取得當前選中的最後一行
-          let nextRow = lastRow.getNextRow(); // 獲取下一行
-          selectedRows.forEach(row => row.deselect()); // 取消所有勾選
-          if (nextRow) nextRow.select(); // 選擇下一行
-        }
-      }
-    });
+    function setupEvents() {
+        const updateCounter = () => {
+            counterDiv.innerText = `已選擇 ${table.getSelectedRows().length} 列`;
+        };
 
-    // ✅ 6. Cmd + E：全部勾選/全部取消勾選
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "e") {
-        event.preventDefault(); // 阻止預設行為
-        let allRows = table.getRows("active");
-        let selectedRows = table.getSelectedRows();
-        if (selectedRows.length > 0) {
-          table.deselectRow(allRows); // 取消全部勾選
-        } else {
-          table.selectRow(allRows); // 全部勾選
-        }
-      }
-    });
+        table.on("rowMouseEnter", (e, row) => {
+            hoveredRow = row;
+            row.getElement().classList.add("hover-highlight");
+        });
 
-    // ✅ 7. Cmd + F
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "f") {
-        event.preventDefault(); // 阻止預設行為
+        table.on("rowMouseLeave", (e, row) => {
+            hoveredRow = null;
+            row.getElement().classList.remove("hover-highlight");
+        });
+
+        table.on("rowSelected", (row) => {
+            row.getElement().classList.add("selected-highlight");
+            updateCounter();
+        });
+
+        table.on("rowDeselected", (row) => {
+            row.getElement().classList.remove("selected-highlight");
+            updateCounter();
+        });
+
+        document.addEventListener("keydown", (e) => {
+            if (isEditing(e)) return;
+            const isMod = e.metaKey || e.ctrlKey;
+            const key = e.key.toLowerCase();
+
+            if (e.key === "Enter" && hoveredRow) {
+                e.preventDefault();
+                hoveredRow.toggleSelect();
+            }
+
+            if (isMod) {
+                switch (key) {
+                    case "a":
+                        e.preventDefault();
+                        smartConditionSelectAndSave();
+                        break;
+                    case "arrowup":
+                        e.preventDefault();
+                        moveSelection(-1);
+                        break;
+                    case "arrowdown":
+                        e.preventDefault();
+                        moveSelection(1);
+                        break;
+                    case "e": {
+                        e.preventDefault();
+                        const activeRows = table.getRows("active");
+                        const selectedActive = activeRows.filter((r) => r.isSelected());
+                        if (selectedActive.length > 0) {
+                            table.deselectRow(activeRows);
+                        } else {
+                            table.selectRow(activeRows);
+                        }
+                        break;
+                    }
+                    case "f":
+                        e.preventDefault();
+                        targetQualitySelect();
+                        break;
+                    case "b":
+                        e.preventDefault();
+                        table.deselectRow();
+                        table.getRows().forEach((r) => {
+                            r.getElement().style.backgroundColor = "";
+                        });
+                        break;
+                    case "s":
+                        e.preventDefault();
+                        table.download("xlsx", "product_targets.xlsx", { sheetName: "Data" });
+                        break;
+                    case "1":
+                    case "2":
+                    case "3":
+                    case "4":
+                        e.preventDefault();
+                        openHeaderMenu(key === "4" ? 2 : 1, key === "4" ? 0 : parseInt(key, 10) - 1);
+                        break;
+                    case "x":
+                        e.preventDefault();
+                        openHeaderMenu(3, 0);
+                        break;
+                }
+            }
+        });
+    }
+
+    async function smartConditionSelectAndSave() {
         table.deselectRow();
+        const activeRows = table.getRows("active");
+        const targetRows = [];
 
-        table.getRows().forEach(row => {
-          let data = row.getData();
-          let rowElement = row.getElement();
+        activeRows.forEach((row) => {
+            const data = row.getData();
+            const daysOfSupply = parseFloat(data.days_of_supply) || 0;
+            const acos = parseFloat(data.acos) || 0;
+            const unitsSold = parseInt(data.units_sold_same_sku, 10) || 0;
+            const bidVal = parseFloat(parseFloat(data.bid || 0).toFixed(2));
+            const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
 
-          if (!rowElement) return; // 確保行已載入
+            if (daysOfSupply > 7 && acos <= 0.1 && unitsSold > 0 && bidVal < cpcVal) {
+                row.select();
+                targetRows.push(row);
+            }
+        });
 
-          if (!isSingleSpace(data.keyword) && data.target_quality.label === "Unknown"  && data.state != "Archived") {
-            rowElement.style.backgroundColor = "rgba(255, 255, 100, 0.3)"; // 透明淡黃色
-            row.select();
-          } else {
-            rowElement.style.backgroundColor = ""; // 回復原色
-          }
+        if (targetRows.length === 0) {
+            console.log("沒有符合條件的 Target");
+            return;
+        }
+
+        sortByCheckBox();
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        scrollFirstSelectedToTop();
+
+        let count = 0;
+        for (const row of targetRows) {
+            const data = row.getData();
+            const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
+            const newBid = Math.min(1, cpcVal).toFixed(2);
+
+            const rowEl = row.getElement();
+            const bidInput = rowEl.querySelector('input[name="bid_fixed_value"]');
+            const saveBtn = rowEl.querySelector('button.save-bid-button[type="submit"]');
+
+            if (bidInput && saveBtn) {
+                bidInput.value = newBid;
+                bidInput.dispatchEvent(new Event("input", { bubbles: true }));
+                bidInput.dispatchEvent(new Event("change", { bubbles: true }));
+                bidInput.style.backgroundColor = "#c8e6c9";
+                saveBtn.click();
+                count++;
+                await new Promise((resolve) => setTimeout(resolve, 200));
+            }
+        }
+
+        console.log(`已儲存 ${count} 筆自動優化資料`);
+    }
+
+    function applyAsinFilter() {
+        const text = document.getElementById("asin-input").value.trim();
+        if (!text) return;
+
+        const asinList = text
+            .split(/[\s,]+/)
+            .map((asin) => asin.trim().toUpperCase().replace(/^"|"$/g, ""))
+            .filter((asin) => asin);
+
+        table.deselectRow();
+        let count = 0;
+
+        table.getRows().forEach((row) => {
+            const data = row.getData();
+            const rowEl = row.getElement();
+            let asin = (data.match_expression_value || "").toUpperCase();
+
+            if (!asin && rowEl) {
+                const asinLink = rowEl.querySelector('a[href*="asin:"]');
+                asin = asinLink ? asinLink.textContent.trim().toUpperCase() : "";
+            }
+
+            if (asinList.includes(asin)) {
+                row.select();
+                count++;
+            }
         });
 
         sortByCheckBox();
-        scrollSelectedRowToTop();
-      }
-    });
+        setTimeout(scrollFirstSelectedToTop, 300);
+        console.log(`共勾選 ${count} 筆符合 ASIN 的資料`);
+    }
 
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "b") {
-        event.preventDefault(); // 阻止預設行為
-        let allRows = table.getRows(); // 取得當前排序後的所有行
+    function targetQualitySelect() {
+        table.deselectRow();
+        table.getRows("active").forEach((row) => {
+            const data = row.getData();
+            const kw = data.keyword || "";
+            const isSingleSpace = kw.trim().split(/\s+/).length === 2;
 
-        allRows.forEach(row => {
-          let data = row.getData();
-          let rowElement = row.getElement();
-
-          if (!rowElement) return; // 確保行已載入
-
-          rowElement.style.backgroundColor = ""; // 回復原色
+            if (!isSingleSpace && data.target_quality && data.target_quality.label === "Unknown" && data.state !== "Archived") {
+                row.select();
+            }
         });
 
-        table.deselectRow();
-      }
-    });
-
-    // ✅ 8. Cmd + 1：執行 openHeaderMenuAndClickOption(0, 0)
-    function openHeaderMenuAndClickOption(columnIndex = 0, optionIndex = 0) {
-      let menuButtons = document.querySelectorAll('.tabulator-col .tabulator-header-popup-button');
-      if (menuButtons[columnIndex]) {
-        menuButtons[columnIndex].click(); // 打開選單
-
-        setTimeout(() => {
-          let menuItems = document.querySelectorAll('.tabulator-menu-item');
-          if (menuItems[optionIndex]) {
-            menuItems[optionIndex].click(); // 點擊選單選項
-          }
-        }, 200);
-      }
+        sortByCheckBox();
+        setTimeout(scrollFirstSelectedToTop, 300);
     }
 
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "1") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(1, 0);
-      }
-    });
+    function moveSelection(direction) {
+        const selected = table.getSelectedRows();
+        if (selected.length === 0) return;
 
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "2") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(1, 1);
-      }
-    });
-
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "3") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(1, 2);
-      }
-    });
-
-    document.addEventListener("keydown", function(event) {
-      if (event.metaKey && event.key === "x") {
-        event.preventDefault(); // 阻止預設行為
-        openHeaderMenuAndClickOption(3, 0);
-      }
-    });
-
-    // ✅ 複製到剪貼簿
-    function copyToClipboard(text) {
-      let textarea = document.createElement("textarea");
-      textarea.value = text;
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      document.body.removeChild(textarea);
-    }
-
-    function createRightDownButton(text, right, bottom, action) {
-      let btn = document.createElement("button");
-      btn.innerText = text;
-      btn.style.position = "fixed";
-      btn.style.right = right;
-      btn.style.bottom = bottom;
-      btn.style.zIndex = "9999";
-      btn.style.padding = "10px 15px";
-      btn.style.background = "rgba(0, 0, 0, 0.7)";
-      btn.style.color = "white";
-      btn.style.border = "none";
-      btn.style.borderRadius = "5px";
-      btn.style.cursor = "pointer";
-      btn.style.fontSize = "14px";
-      btn.addEventListener("mouseenter", () => btn.style.background = "black");
-      btn.addEventListener("mouseleave", () => btn.style.background = "rgba(0, 0, 0, 0.7)");
-      btn.addEventListener("click", action);
-      document.body.appendChild(btn);
-    }
-
-
-    // 「回到最上方」按鈕
-    createRightDownButton("E", "100px", "120px", expandAllGroups);
-    // 「回到最上方」按鈕
-    createRightDownButton("C", "100px", "60px", collapseAllGroups);
-
-    // 「回到最上方」按鈕
-    createRightDownButton("⬆", "50px", "120px", () => window.scrollTo({ top: 0, behavior: "smooth" }));
-    // 「回到最下方」按鈕
-    createRightDownButton("⬇", "50px", "60px", () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }));
-
-    function collapseAllGroups() {
-      let groupCount = table.getGroups().length;
-      for (let i = 0; i < groupCount; i++) {
-        table.getGroups()[i].hide();
-      }
-    };
-
-    function expandAllGroups() {
-      let groupCount = table.getGroups().length;
-      for (let i = 0; i < groupCount; i++) {
-        table.getGroups()[i].show();
-      }
-    };
-
-    function scrollSelectedRowToTop() {
-      let selectedRows = table.getSelectedRows();
-
-      if (selectedRows.length === 0) {
-        console.warn("沒有選擇任何行，無法滾動");
-        return;
-      }
-
-      let firstRow = selectedRows[0]; // 取得第一個被勾選的行
-
-      // ✅ 1. 讓 Tabulator 內部滾動到該行，確保它被載入
-      table.scrollToRow(firstRow, "top", false).then(() => {
-        console.log("已將表格滾動到該行");
-
-        // ✅ 2. 取得該行的 DOM 元素
-        let rowElement = firstRow.getElement();
-        if (!rowElement) {
-          console.warn("仍無法找到行的 DOM 元素，可能是虛擬 DOM 尚未渲染");
-          return;
+        const targetRow = direction > 0 ? selected[selected.length - 1].getNextRow() : selected[0].getPrevRow();
+        if (targetRow) {
+            table.deselectRow();
+            targetRow.select();
+            targetRow.getElement().scrollIntoView({ block: "center", behavior: "smooth" });
         }
-
-        // ✅ 3. 讓 Tabulator 內部滾動條精確滾動，使該行置頂
-        let tableContainer = table.element; // Tabulator 容器
-        let rowOffset = rowElement.offsetTop; // 計算行的位置
-        tableContainer.scrollTop = rowOffset;
-
-        console.log("Tabulator 內部滾動成功");
-
-        // ✅ 4. 讓網頁主滾動條同步調整
-        let tableTopOffset = tableContainer.getBoundingClientRect().top + window.scrollY;
-        let targetScrollY = rowOffset + tableTopOffset;
-        window.scrollTo({ top: targetScrollY, behavior: "smooth" });
-
-        console.log("已將頁面滾動到該行");
-      }).catch(() => {
-        console.warn("表格滾動失敗，可能是虛擬 DOM 限制");
-      });
     }
 
-    function isSingleSpace(str) {
-      return str.trim().split(/\s+/).length === 2;
+    function openHeaderMenu(colIdx, optIdx) {
+        const buttons = document.querySelectorAll(".tabulator-header-popup-button");
+        if (buttons[colIdx]) {
+            buttons[colIdx].click();
+            setTimeout(() => {
+                const items = document.querySelectorAll(".tabulator-menu-item");
+                if (items[optIdx]) items[optIdx].click();
+            }, 200);
+        }
     }
-
-    if (document.getElementById("asin-filter-box")) return; // 避免重複插入
-
-    // 建立輸入區塊
-    const container = document.createElement("div");
-    container.id = "asin-filter-box";
-    container.style.position = "fixed";
-    container.style.top = "10px";
-    container.style.right = "200px";
-    container.style.zIndex = 9999;
-    container.style.background = "#fff";
-    container.style.border = "1px solid #ccc";
-    container.style.padding = "10px";
-    container.style.boxShadow = "0 2px 8px rgba(0,0,0,0.2)";
-    container.style.borderRadius = "8px";
-    container.innerHTML = `
-    <textarea id="asin-input" rows="5" style="width: 200px;" placeholder="貼上 ASIN，一行一個"></textarea>
-    <br>
-    <button id="apply-asin-filter">勾選符合 ASIN</button>
-    `;
-    document.body.appendChild(container);
-
-    // 處理按鈕點擊
-    document.getElementById("apply-asin-filter").addEventListener("click", () => {
-      const asinText = document.getElementById("asin-input").value.trim();
-      if (!asinText) return;
-
-      const asinList = asinText
-      .split(/[\s,]+/)
-      .map(a => a.trim().toUpperCase().replace(/^"|"$/g, ''))
-      .filter(a => a); // 清除空白
-
-      console.log(asinList);
-
-      const rows = table.getRows();
-
-      table.deselectRow(); // 清除舊的勾選
-
-      let matchedCount = 0;
-
-      rows.forEach(row => {
-        const data = row.getData();
-        const rowElement = row.getElement();
-
-        let asin = (data.match_expression_value || "").toUpperCase();
-        if (!asin && rowElement) {
-          asin = rowElement.querySelector('a[href*="asin:"]')?.textContent?.trim().toUpperCase() || "";
-        }
-
-        if (asinList.includes(asin)) {
-          matchedCount++;
-          row.select();
-        }
-      });
-
-      table.setSort("checkBox", "desc");
-
-      scrollSelectedRowToTop();
-
-      console.log(`共勾選 ${matchedCount} 筆 ASIN 符合的資料`);
-    });
 
     function sortByCheckBox() {
-      document.querySelector("#targets-table > div.tabulator-header > div > div.tabulator-headers > div:nth-child(1) > div > div > div.tabulator-col-sorter > div").click();
+        const header = document.querySelector(".tabulator-col[tabulator-field='checkBox'] .tabulator-col-sorter");
+        if (header) header.click();
     }
 
-    console.log("Tampermonkey Script Loaded: Tabulator Enhancements Activated!");
-  }
-
-  let checkTabulator = setInterval(() => {
-    if (typeof Tabulator !== "undefined" && Tabulator.findTable("#targets-table").length > 0) {
-      clearInterval(checkTabulator);
-      initTableEnhancements();
+    function scrollFirstSelectedToTop() {
+        const selected = table.getSelectedRows()[0];
+        if (selected) {
+            table.scrollToRow(selected, "top", false);
+        }
     }
-  }, 500);
+
+    const checkTabulator = setInterval(() => {
+        if (typeof Tabulator !== "undefined" && Tabulator.findTable("#targets-table").length > 0) {
+            clearInterval(checkTabulator);
+            init();
+        }
+    }, 500);
 })();
