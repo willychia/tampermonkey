@@ -19,7 +19,6 @@ This script improves the interaction and usability of the product targeting tabl
 - `Enter`: Toggle the hovered row
 - `Cmd/Ctrl + A`: Select matching rows and update the bid to `min(1, CPC)`
 - `Cmd/Ctrl + E`: Select or deselect active rows
-- `Cmd/Ctrl + F`: Select rows whose target quality is `Unknown`
 - `Cmd/Ctrl + B`: Clear selection
 - `Cmd/Ctrl + S`: Export the table to Excel
 - `Cmd/Ctrl + ↑ / ↓`: Move the selection

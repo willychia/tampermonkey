@@ -18,7 +18,6 @@
 - `Enter`：切換目前滑鼠停留列的選取狀態
 - `Cmd/Ctrl + A`：找出符合條件的列，將 Bid 自動更新為 `min(1, CPC)`，並逐筆送出儲存
 - `Cmd/Ctrl + E`：全選或取消全選目前畫面中的有效列
-- `Cmd/Ctrl + F`：勾選 `target_quality = Unknown`、非 `Archived`，且 keyword 不是剛好兩個單字的列
 - `Cmd/Ctrl + B`：清空所有選取
 - `Cmd/Ctrl + S`：將目前表格資料匯出成 Excel
 - `Cmd/Ctrl + ↑ / ↓`：把選取往上一列或下一列移動

@@ -170,10 +170,6 @@
                     selectedActive.length > 0 ? table.deselectRow(activeRows) : table.selectRow(activeRows);
                     break;
                 }
-                case "f":
-                    e.preventDefault();
-                    targetQualitySelect();
-                    break;
                 case "b":
                     e.preventDefault();
                     table.deselectRow();
@@ -287,25 +283,6 @@
         await sortByCheckBox();
         utils.scrollFirstSelectedToTop(table);
         console.log(`共勾選 ${count} 筆符合 ASIN 的資料`);
-    }
-
-    async function targetQualitySelect() {
-        table = getTable();
-        if (!table) return;
-
-        table.deselectRow();
-        table.getRows("active").forEach((row) => {
-            const data = row.getData();
-            const kw = data.keyword || "";
-            const isTwoWords = kw.trim().split(/\s+/).length === 2;
-
-            if (!isTwoWords && data.target_quality?.label === "Unknown" && data.state !== "Archived") {
-                row.select();
-            }
-        });
-
-        await sortByCheckBox();
-        utils.scrollFirstSelectedToTop(table);
     }
 
     function moveSelection(direction) {
