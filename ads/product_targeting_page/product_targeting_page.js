@@ -1,19 +1,34 @@
 // ==UserScript==
 // @name         Product Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.03.13.5
+// @version      2026.04.01.1
 // @description  Product Targeting 加強版：Cmd+A 自動調價、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
 // @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
+// @require      https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/shared/tabulator_page_utils.js
 // @grant        GM_addStyle
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function () {
+    "use strict";
 
-    // 1. 注入 UI 樣式
+    const SELECTOR = "#targets-table";
+    const TABLE_FLAG = "__ptp_enhanced_bound";
+    const COUNTER_ID = "selection-counter";
+    const ASIN_BOX_ID = "asin-filter-box";
+    const BUTTON_CLASS = "custom-float-btn";
+    const utils = window.TMTabulatorPageUtils;
+    if (!utils) {
+        console.error("TMTabulatorPageUtils failed to load for product targeting page.");
+        return;
+    }
+    let table = null;
+    const hoveredState = { current: null };
+    let keydownBound = false;
+    let observerStarted = false;
+
     GM_addStyle(`
         .hover-highlight { border: 3px solid red !important; }
         .selected-highlight { border: 3px solid yellow !important; }
@@ -35,28 +50,27 @@
         }
     `);
 
-    let table, hoveredRow = null, counterDiv;
-
-    // 防衝突判斷
-    const isEditing = (ev) => {
-        const el = ev.target;
-        if (!el) return false;
-        const tag = (el.tagName || "").toLowerCase();
-        return el.isContentEditable || tag === "input" || tag === "textarea" || tag === "select";
-    };
-
-    function init() {
-        table = Tabulator.findTable("#targets-table")[0];
-        if (!table) return;
-
-        setupColumns();
-        setupUI();
-        setupEvents();
-        console.log("Product Targeting Enhancements Activated!");
+    function getTable() {
+        return utils.getTableBySelector(SELECTOR);
     }
 
-    function setupColumns() {
-        const columns = table.getColumnDefinitions();
+    function init() {
+        table = getTable();
+        if (!table) return;
+
+        if (!table[TABLE_FLAG]) {
+            setupColumns(table);
+            bindTableEvents(table);
+            table[TABLE_FLAG] = true;
+        }
+
+        setupUI();
+        bindKeyboardOnce();
+        updateCounter();
+    }
+
+    function setupColumns(activeTable) {
+        const columns = activeTable.getColumnDefinitions();
         if (columns.length > 0) columns[0].field = "checkBox";
 
         const enhancedCols = columns.map((col) => {
@@ -68,6 +82,7 @@
                     headerFilterPlaceholder: "Less than"
                 };
             }
+
             if (col.field === "last_buy_box_timestamp") {
                 return {
                     ...col,
@@ -81,139 +96,110 @@
                     }
                 };
             }
+
             return col;
         });
 
-        table.setColumns(enhancedCols);
+        activeTable.setColumns(enhancedCols);
     }
 
     function setupUI() {
-        counterDiv = document.createElement("div");
-        counterDiv.id = "selection-counter";
-        counterDiv.innerText = "已選擇 0 列";
-        document.body.appendChild(counterDiv);
+        utils.ensureCounter(COUNTER_ID, table ? `已選擇 ${table.getSelectedRows().length} 列` : "已選擇 0 列");
+        utils.ensureButtons([
+            { id: "ptp-btn-expand", text: "E", right: "100px", bottom: "120px", action: () => getTable()?.getGroups().forEach((g) => g.show()) },
+            { id: "ptp-btn-collapse", text: "C", right: "100px", bottom: "60px", action: () => getTable()?.getGroups().forEach((g) => g.hide()) },
+            { id: "ptp-btn-up", text: "⬆", right: "50px", bottom: "120px", action: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
+            { id: "ptp-btn-down", text: "⬇", right: "50px", bottom: "60px", action: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }) }
+        ], BUTTON_CLASS);
 
-        const buttons = [
-            { t: "E", r: "100px", b: "120px", a: () => table.getGroups().forEach((g) => g.show()) },
-            { t: "C", r: "100px", b: "60px", a: () => table.getGroups().forEach((g) => g.hide()) },
-            { t: "⬆", r: "50px", b: "120px", a: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
-            { t: "⬇", r: "50px", b: "60px", a: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }) }
-        ];
-
-        buttons.forEach((btn) => {
-            const el = document.createElement("button");
-            el.className = "custom-float-btn";
-            el.innerText = btn.t;
-            el.style.right = btn.r;
-            el.style.bottom = btn.b;
-            el.onclick = btn.a;
-            document.body.appendChild(el);
-        });
-
-        if (!document.getElementById("asin-filter-box")) {
+        if (!document.getElementById(ASIN_BOX_ID)) {
             const container = document.createElement("div");
-            container.id = "asin-filter-box";
+            container.id = ASIN_BOX_ID;
             container.innerHTML = `
                 <textarea id="asin-input" rows="5" style="width: 200px; display: block; margin-bottom: 5px;" placeholder="貼上 ASIN，一行一個"></textarea>
                 <button id="apply-asin-filter" style="width: 100%; cursor: pointer;">勾選符合 ASIN</button>
             `;
             document.body.appendChild(container);
-            document.getElementById("apply-asin-filter").onclick = applyAsinFilter;
         }
+
+        const applyBtn = document.getElementById("apply-asin-filter");
+        if (applyBtn) applyBtn.onclick = applyAsinFilter;
     }
 
-    function setupEvents() {
-        const updateCounter = () => {
-            counterDiv.innerText = `已選擇 ${table.getSelectedRows().length} 列`;
-        };
+    function bindTableEvents(activeTable) {
+        utils.bindSelectionState(activeTable, COUNTER_ID, hoveredState);
+    }
 
-        table.on("rowMouseEnter", (e, row) => {
-            hoveredRow = row;
-            row.getElement().classList.add("hover-highlight");
-        });
-
-        table.on("rowMouseLeave", (e, row) => {
-            hoveredRow = null;
-            row.getElement().classList.remove("hover-highlight");
-        });
-
-        table.on("rowSelected", (row) => {
-            row.getElement().classList.add("selected-highlight");
-            updateCounter();
-        });
-
-        table.on("rowDeselected", (row) => {
-            row.getElement().classList.remove("selected-highlight");
-            updateCounter();
-        });
+    function bindKeyboardOnce() {
+        if (keydownBound) return;
+        keydownBound = true;
 
         document.addEventListener("keydown", (e) => {
-            if (isEditing(e)) return;
+            table = getTable();
+            if (!table || utils.isEditingEvent(e)) return;
+
             const isMod = e.metaKey || e.ctrlKey;
             const key = e.key.toLowerCase();
 
-            if (e.key === "Enter" && hoveredRow) {
+            if (e.key === "Enter" && hoveredState.current) {
                 e.preventDefault();
-                hoveredRow.toggleSelect();
+                hoveredState.current.toggleSelect();
+                return;
             }
 
-            if (isMod) {
-                switch (key) {
-                    case "a":
-                        e.preventDefault();
-                        smartConditionSelectAndSave();
-                        break;
-                    case "arrowup":
-                        e.preventDefault();
-                        moveSelection(-1);
-                        break;
-                    case "arrowdown":
-                        e.preventDefault();
-                        moveSelection(1);
-                        break;
-                    case "e": {
-                        e.preventDefault();
-                        const activeRows = table.getRows("active");
-                        const selectedActive = activeRows.filter((r) => r.isSelected());
-                        if (selectedActive.length > 0) {
-                            table.deselectRow(activeRows);
-                        } else {
-                            table.selectRow(activeRows);
-                        }
-                        break;
-                    }
-                    case "f":
-                        e.preventDefault();
-                        targetQualitySelect();
-                        break;
-                    case "b":
-                        e.preventDefault();
-                        table.deselectRow();
-                        table.getRows().forEach((r) => {
-                            r.getElement().style.backgroundColor = "";
-                        });
-                        break;
-                    case "s":
-                        e.preventDefault();
-                        table.download("xlsx", "product_targets.xlsx", { sheetName: "Data" });
-                        break;
-                    case "1":
-                    case "2":
-                    case "3":
-                    case "4":
-                        e.preventDefault();
-                        openHeaderMenu(key === "4" ? 2 : 1, key === "4" ? 0 : parseInt(key, 10) - 1);
-                        break;
-                    case "x":
-                        e.preventDefault();
-                        openHeaderMenu(3, 0);
-                        break;
+            if (!isMod) return;
+
+            switch (key) {
+                case "a":
+                    e.preventDefault();
+                    smartConditionSelectAndSave();
+                    break;
+                case "arrowup":
+                    e.preventDefault();
+                    moveSelection(-1);
+                    break;
+                case "arrowdown":
+                    e.preventDefault();
+                    moveSelection(1);
+                    break;
+                case "e": {
+                    e.preventDefault();
+                    const activeRows = table.getRows("active");
+                    const selectedActive = activeRows.filter((r) => r.isSelected());
+                    selectedActive.length > 0 ? table.deselectRow(activeRows) : table.selectRow(activeRows);
+                    break;
                 }
+                case "f":
+                    e.preventDefault();
+                    targetQualitySelect();
+                    break;
+                case "b":
+                    e.preventDefault();
+                    table.deselectRow();
+                    break;
+                case "s":
+                    e.preventDefault();
+                    table.download("xlsx", "product_targets.xlsx", { sheetName: "Data" });
+                    break;
+                case "1":
+                case "2":
+                case "3":
+                case "4":
+                    e.preventDefault();
+                    openHeaderMenu(key === "4" ? 2 : 1, key === "4" ? 0 : parseInt(key, 10) - 1);
+                    break;
+                case "x":
+                    e.preventDefault();
+                    openHeaderMenu(3, 0);
+                    break;
             }
         });
     }
 
     async function smartConditionSelectAndSave() {
+        table = getTable();
+        if (!table) return;
+
         table.deselectRow();
         const activeRows = table.getRows("active");
         const targetRows = [];
@@ -237,8 +223,7 @@
             return;
         }
 
-        sortByCheckBox();
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sortByCheckBox();
         scrollFirstSelectedToTop();
 
         let count = 0;
@@ -248,31 +233,36 @@
             const newBid = Math.min(1, cpcVal).toFixed(2);
 
             const rowEl = row.getElement();
-            const bidInput = rowEl.querySelector('input[name="bid_fixed_value"]');
-            const saveBtn = rowEl.querySelector('button.save-bid-button[type="submit"]');
+            const bidInput = rowEl?.querySelector('input[name="bid_fixed_value"]');
+            const saveBtn = rowEl?.querySelector('button.save-bid-button[type="submit"]');
 
-            if (bidInput && saveBtn) {
-                bidInput.value = newBid;
-                bidInput.dispatchEvent(new Event("input", { bubbles: true }));
-                bidInput.dispatchEvent(new Event("change", { bubbles: true }));
-                bidInput.style.backgroundColor = "#c8e6c9";
-                saveBtn.click();
-                count++;
-                await new Promise((resolve) => setTimeout(resolve, 200));
-            }
+            if (!bidInput || !saveBtn) continue;
+
+            bidInput.value = newBid;
+            bidInput.dispatchEvent(new Event("input", { bubbles: true }));
+            bidInput.dispatchEvent(new Event("change", { bubbles: true }));
+            bidInput.style.backgroundColor = "#c8e6c9";
+            saveBtn.click();
+            count++;
+            await utils.wait(200);
         }
 
         console.log(`已儲存 ${count} 筆自動優化資料`);
     }
 
-    function applyAsinFilter() {
-        const text = document.getElementById("asin-input").value.trim();
+    async function applyAsinFilter() {
+        table = getTable();
+        if (!table) return;
+
+        const text = document.getElementById("asin-input")?.value.trim();
         if (!text) return;
 
-        const asinList = text
-            .split(/[\s,]+/)
-            .map((asin) => asin.trim().toUpperCase().replace(/^"|"$/g, ""))
-            .filter((asin) => asin);
+        const asinSet = new Set(
+            text
+                .split(/[\s,]+/)
+                .map((asin) => asin.trim().toUpperCase().replace(/^"|"$/g, ""))
+                .filter(Boolean)
+        );
 
         table.deselectRow();
         let count = 0;
@@ -287,72 +277,92 @@
                 asin = asinLink ? asinLink.textContent.trim().toUpperCase() : "";
             }
 
-            if (asinList.includes(asin)) {
+            if (asinSet.has(asin)) {
                 row.select();
                 count++;
             }
         });
 
-        sortByCheckBox();
-        setTimeout(scrollFirstSelectedToTop, 300);
+        await sortByCheckBox();
+        utils.scrollFirstSelectedToTop(table);
         console.log(`共勾選 ${count} 筆符合 ASIN 的資料`);
     }
 
-    function targetQualitySelect() {
+    async function targetQualitySelect() {
+        table = getTable();
+        if (!table) return;
+
         table.deselectRow();
         table.getRows("active").forEach((row) => {
             const data = row.getData();
             const kw = data.keyword || "";
-            const isSingleSpace = kw.trim().split(/\s+/).length === 2;
+            const isTwoWords = kw.trim().split(/\s+/).length === 2;
 
-            if (!isSingleSpace && data.target_quality && data.target_quality.label === "Unknown" && data.state !== "Archived") {
+            if (!isTwoWords && data.target_quality?.label === "Unknown" && data.state !== "Archived") {
                 row.select();
             }
         });
 
-        sortByCheckBox();
-        setTimeout(scrollFirstSelectedToTop, 300);
+        await sortByCheckBox();
+        utils.scrollFirstSelectedToTop(table);
     }
 
     function moveSelection(direction) {
+        table = getTable();
+        if (!table) return;
+
         const selected = table.getSelectedRows();
         if (selected.length === 0) return;
 
         const targetRow = direction > 0 ? selected[selected.length - 1].getNextRow() : selected[0].getPrevRow();
-        if (targetRow) {
-            table.deselectRow();
-            targetRow.select();
-            targetRow.getElement().scrollIntoView({ block: "center", behavior: "smooth" });
-        }
+        if (!targetRow) return;
+
+        table.deselectRow();
+        targetRow.select();
+        targetRow.getElement()?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
 
     function openHeaderMenu(colIdx, optIdx) {
         const buttons = document.querySelectorAll(".tabulator-header-popup-button");
-        if (buttons[colIdx]) {
-            buttons[colIdx].click();
-            setTimeout(() => {
-                const items = document.querySelectorAll(".tabulator-menu-item");
-                if (items[optIdx]) items[optIdx].click();
-            }, 200);
-        }
+        if (!buttons[colIdx]) return;
+
+        buttons[colIdx].click();
+        setTimeout(() => {
+            const items = document.querySelectorAll(".tabulator-menu-item");
+            if (items[optIdx]) items[optIdx].click();
+        }, 200);
     }
 
-    function sortByCheckBox() {
-        const header = document.querySelector(".tabulator-col[tabulator-field='checkBox'] .tabulator-col-sorter");
-        if (header) header.click();
+    async function sortByCheckBox() {
+        table = getTable();
+        if (!table) return;
+        await utils.sortByField(table, "checkBox", "desc");
     }
 
     function scrollFirstSelectedToTop() {
+        table = getTable();
+        if (!table) return;
+
         const selected = table.getSelectedRows()[0];
         if (selected) {
             table.scrollToRow(selected, "top", false);
         }
+        updateCounter();
     }
 
-    const checkTabulator = setInterval(() => {
-        if (typeof Tabulator !== "undefined" && Tabulator.findTable("#targets-table").length > 0) {
-            clearInterval(checkTabulator);
-            init();
+    function updateCounter() {
+        const counterDiv = document.getElementById(COUNTER_ID);
+        if (counterDiv && table) {
+            counterDiv.innerText = `已選擇 ${table.getSelectedRows().length} 列`;
         }
-    }, 500);
+    }
+
+    function startInitObserver() {
+        if (observerStarted) return;
+        observerStarted = true;
+
+        utils.startInitObserver(init);
+    }
+
+    startInitObserver();
 })();

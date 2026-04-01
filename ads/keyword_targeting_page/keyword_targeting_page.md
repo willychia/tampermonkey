@@ -2,47 +2,33 @@
 
 Tampermonkey script that enhances the keyword management interface in the Hourloop Amazon Ads Admin Panel using Tabulator.
 
-## 📌 Description
+## Description
 
-This script improves the interactivity and efficiency of working with the keyword table by enabling:
+This script improves the interactivity and efficiency of working with the keyword table.
 
-### ✅ Key Features
+## Core Features
 
-- **Row Highlighting**:
-  - Hover: Red border
-  - Selected: Yellow border
-- **Selection Tracker**: Floating count of selected rows
-- **Keyboard Shortcuts**:
-  - `Enter`: Toggle current hovered row selection
-  - `Cmd/Ctrl + ↑ / ↓`: Move selection up/down
-  - `Cmd/Ctrl + E`: Toggle select all / deselect all
-  - `Cmd/Ctrl + F`: Auto-select rows where:
-    - keyword is more than one word
-    - target_quality is "Unknown"
-    - state is not "Archived"
-  - `Cmd/Ctrl + B`: Clear all highlighting and deselect
-  - `Cmd/Ctrl + 1 / 2 / 3 / C`: Trigger header menu options for sorting or filtering
-- **Scroll Buttons**:
-  - Top-right buttons for scroll to top / bottom
-  - Expand / collapse grouped rows
-- **Auto-scroll to first selected row**
+- Hovered rows get a red border.
+- Selected rows get a yellow border.
+- A floating counter shows the current selected-row count.
+- Floating buttons expand or collapse groups and jump to the top or bottom of the page.
 
-## 🧠 Hidden Utilities
+## Keyboard Shortcuts
 
-- `sortByCheckBox()`: Triggers sorting on checkbox column
-- `isSingleSpace(str)`: Helper for keyword spacing filter
+- `Enter`: Toggle the hovered row
+- `Cmd/Ctrl + A`: Select matching rows and update the bid to `min(1, CPC)`
+- `Cmd/Ctrl + E`: Select or deselect active rows
+- `Cmd/Ctrl + F`: Select keywords with three or more words
+- `Cmd/Ctrl + B`: Clear selection
+- `Cmd/Ctrl + S`: Export the table to Excel
+- `Cmd/Ctrl + ↑ / ↓`: Move the selection
+- `Cmd/Ctrl + 1 / 2 / 3 / 4 / X`: Trigger configured Tabulator header menu actions
 
-## 🌐 Match URL
+## Stability Notes
+
+- The script avoids duplicate UI injection on page re-render.
+- The script safely rebinds to a recreated Tabulator instance.
+
+## Match URL
 
 - `https://admin.hourloop.com/amazon_ads/sp/keywords?*`
-
-## 🛠 Requirements
-
-- Browser with Tampermonkey extension installed
-- Table must use `#keywords-table` as Tabulator selector
-
-## 📥 Installation
-
-1. Install [Tampermonkey](https://www.tampermonkey.net/)
-2. Create a new script and paste in `Admin_Keyword_Page_Enhanced_Function.user.js`
-3. Save and activate it for the matching page

@@ -2,43 +2,33 @@
 
 This Tampermonkey script enhances the Tabulator table used in the Amazon Ads Admin interface on Hourloop.
 
-## 📌 Description
+## Description
 
-The script provides a suite of UI and functional enhancements for interacting with ad groups, including:
+The script adds selection tools and safer bulk actions for the ad group page.
 
-### ✅ Core Features
+## Core Features
 
-- **Hover Highlighting**: Rows highlight red when hovered.
-- **Row Selection Border**: Selected rows get a white border.
-- **Selection Counter**: Top-right floating display of selected row count.
-- **Keyboard Shortcuts**:
-  - `Enter`: Toggle selection of hovered row.
-  - `Cmd/Ctrl + ↑ / ↓`: Move selection up/down.
-  - `Cmd/Ctrl + E`: Select or deselect all.
-  - `Cmd/Ctrl + F`: Highlight rows where `num_enabled_targets < 10` and auto-scroll to topmost match.
-  - `Cmd/Ctrl + B`: Clear highlighting and selections.
-  - `Cmd/Ctrl + D`: Open product image links from selected rows.
-  - `Cmd/Ctrl + K`: Open `num_enabled_targets` links from selected rows.
-  - `Cmd/Ctrl + S`: Export filtered table data to Excel.
-  - `Cmd/Ctrl + J`: Select all rows with missing product image URLs.
-  - `Cmd/Ctrl + X`: Copy all Selected rows' Ad Group Name
-  - `Cmd/Ctrl + 1-5`: Clicks column header menu items by index.
-- **Scroll Buttons**: Buttons in lower-right corner for scrolling to top/bottom.
-- **Group Expand/Collapse Buttons**: Buttons to expand/collapse grouped rows.
-- **ASIN Filter Box**: Manually enter ASINs to auto-select matching rows.
+- Hover highlighting for rows
+- Stronger styling for selected rows
+- Floating panel with current selection count
+- Batch selection by ASIN or ad group name
+- Scroll position preservation after sort-driven actions
 
-## 🌐 Match URL
+## Keyboard Shortcuts
+
+- `Enter`: Toggle the hovered row
+- `Cmd/Ctrl + E`: Select or deselect active rows
+- `Cmd/Ctrl + G`: Select the first N active rows
+- `Cmd/Ctrl + B`: Clear selection
+- `Cmd/Ctrl + D`: Open selected product links, up to 20 tabs
+- `Cmd/Ctrl + ↑ / ↓`: Move the selection
+- `Cmd/Ctrl + 1 / 2 / 3 / 4 / 5 / 6 / X`: Trigger configured Tabulator header menu actions
+
+## Stability Notes
+
+- The script safely rebinds after the page recreates the Tabulator instance.
+- The panel is created once and then reuses the current table.
+
+## Match URL
 
 - `https://admin.hourloop.com/amazon_ads/sp/ad_groups?*`
-
-## 🛠 Requirements
-
-- Browser with Tampermonkey extension
-- Page must use a Tabulator instance with `#ad-groups-table` ID
-
-## 📥 Installation
-
-1. Install [Tampermonkey](https://www.tampermonkey.net/)
-2. Create a new script and paste the contents of `Admin Ad Group Additional Function-2.0.user.js`
-3. Save the script and ensure it is enabled when visiting the matched URL.
-

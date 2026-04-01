@@ -1,2 +1,28 @@
-# tampermonkey
-All TamperMonkey Code by Willy Chia
+# TamperMonkey Utilities
+
+Tampermonkey scripts for Hourloop Amazon Ads admin pages.
+
+## Scripts
+
+- `ads/product_targeting_page/product_targeting_page.js`
+  Product targeting helpers for bulk selection, ASIN filtering, and bid updates.
+- `ads/keyword_targeting_page/keyword_targeting_page.js`
+  Keyword targeting helpers for bulk selection, long-tail filtering, and bid updates.
+- `ads/ad_group_page/ad_group_page.js`
+  Ad group helpers for bulk selection, quick-open actions, and scroll-safe batch operations.
+- `ads/shared/tabulator_page_utils.js`
+  Shared helper utilities used by the Tabulator-based page scripts.
+
+## Maintenance Notes
+
+- Each script is standalone so it can be installed independently in Tampermonkey.
+- Product and keyword pages share a common helper via Tampermonkey `@require`.
+- The pages rely on Tabulator tables rendered inside the Hourloop admin.
+- Page-specific documentation is stored beside each script.
+- Versions are date-based so release changes are easy to track.
+
+## Suggested Check Flow
+
+1. Edit the matching page script.
+2. Reload the Hourloop page.
+3. Test shortcuts on a small result set before using bulk actions broadly.

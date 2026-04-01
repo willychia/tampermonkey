@@ -1,17 +1,32 @@
 // ==UserScript==
 // @name         Keyword Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.03.13.4
+// @version      2026.04.01.1
 // @description  Cmd+A 條件勾選並自動更新 Bid 為 Min(1, CPC)
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/keyword_targeting_page/keyword_targeting_page.js
 // @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/keyword_targeting_page/keyword_targeting_page.js
+// @require      https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/shared/tabulator_page_utils.js
 // @grant        GM_addStyle
 // ==/UserScript==
 
-(function() {
-    'use strict';
+(function () {
+    "use strict";
+
+    const SELECTOR = "#keywords-table";
+    const TABLE_FLAG = "__ktp_enhanced_bound";
+    const COUNTER_ID = "selection-counter";
+    const BUTTON_CLASS = "custom-float-btn";
+    const utils = window.TMTabulatorPageUtils;
+    if (!utils) {
+        console.error("TMTabulatorPageUtils failed to load for keyword targeting page.");
+        return;
+    }
+    let table = null;
+    const hoveredState = { current: null };
+    let keydownBound = false;
+    let observerStarted = false;
 
     GM_addStyle(`
         .hover-highlight { border: 3px solid red !important; }
@@ -30,46 +45,45 @@
         .custom-float-btn:hover { background: black; }
     `);
 
-    let table;
-    let hoveredRow = null;
-    let counterDiv;
-
-    const isEditing = (ev) => {
-        const el = ev.target;
-        if (!el) return false;
-        const tag = (el.tagName || '').toLowerCase();
-        return el.isContentEditable || tag === 'input' || tag === 'textarea' || tag === 'select';
-    };
-
-    function init() {
-        table = Tabulator.findTable('#keywords-table')[0];
-        if (!table) return;
-        setupColumns();
-        setupUI();
-        setupEvents();
-        console.log('🚀 Bid Auto-Adjust Ready (Cmd+A)!');
+    function getTable() {
+        return utils.getTableBySelector(SELECTOR);
     }
 
-    function setupColumns() {
-        const columns = table.getColumnDefinitions();
-        if (columns.length > 0) columns[0].field = 'checkBox';
+    function init() {
+        table = getTable();
+        if (!table) return;
+
+        if (!table[TABLE_FLAG]) {
+            setupColumns(table);
+            bindTableEvents(table);
+            table[TABLE_FLAG] = true;
+        }
+
+        setupUI();
+        bindKeyboardOnce();
+        updateCounter();
+    }
+
+    function setupColumns(activeTable) {
+        const columns = activeTable.getColumnDefinitions();
+        if (columns.length > 0) columns[0].field = "checkBox";
 
         const enhancedCols = columns.map((col) => {
-            if (col.field === 'stock_on_hand') {
+            if (col.field === "stock_on_hand") {
                 return {
                     ...col,
-                    headerFilter: 'number',
-                    headerFilterFunc: '<=',
-                    headerFilterPlaceholder: 'Less than'
+                    headerFilter: "number",
+                    headerFilterFunc: "<=",
+                    headerFilterPlaceholder: "Less than"
                 };
             }
 
-            if (col.field === 'last_buy_box_timestamp' || col.field === 'created_at') {
-                const isDay = col.field === 'created_at';
+            if (col.field === "last_buy_box_timestamp" || col.field === "created_at") {
+                const isDay = col.field === "created_at";
                 return {
                     ...col,
-                    headerFilter: 'number',
-                    headerFilterPlaceholder: isDay ? 'Days within' : 'Hours within',
+                    headerFilter: "number",
+                    headerFilterPlaceholder: isDay ? "Days within" : "Hours within",
                     headerFilterFunc: (filterValue, cellValue) => {
                         const v = parseFloat(filterValue);
                         if (!Number.isFinite(v) || !cellValue) return true;
@@ -82,127 +96,98 @@
             return col;
         });
 
-        table.setColumns(enhancedCols);
+        activeTable.setColumns(enhancedCols);
     }
 
     function setupUI() {
-        counterDiv = document.createElement('div');
-        counterDiv.id = 'selection-counter';
-        counterDiv.innerText = '已選擇 0 列';
-        document.body.appendChild(counterDiv);
-
-        const buttons = [
-            { t: 'E', r: '100px', b: '120px', a: () => table.getGroups().forEach((g) => g.show()) },
-            { t: 'C', r: '100px', b: '60px', a: () => table.getGroups().forEach((g) => g.hide()) },
-            { t: '⬆', r: '50px', b: '120px', a: () => window.scrollTo({ top: 0, behavior: 'smooth' }) },
-            { t: '⬇', r: '50px', b: '60px', a: () => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }) }
-        ];
-
-        buttons.forEach((btn) => {
-            const el = document.createElement('button');
-            el.className = 'custom-float-btn';
-            el.innerText = btn.t;
-            el.style.right = btn.r;
-            el.style.bottom = btn.b;
-            el.onclick = btn.a;
-            document.body.appendChild(el);
-        });
+        utils.ensureCounter(COUNTER_ID, table ? `已選擇 ${table.getSelectedRows().length} 列` : "已選擇 0 列");
+        utils.ensureButtons([
+            { id: "ktp-btn-expand", text: "E", right: "100px", bottom: "120px", action: () => getTable()?.getGroups().forEach((g) => g.show()) },
+            { id: "ktp-btn-collapse", text: "C", right: "100px", bottom: "60px", action: () => getTable()?.getGroups().forEach((g) => g.hide()) },
+            { id: "ktp-btn-up", text: "⬆", right: "50px", bottom: "120px", action: () => window.scrollTo({ top: 0, behavior: "smooth" }) },
+            { id: "ktp-btn-down", text: "⬇", right: "50px", bottom: "60px", action: () => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" }) }
+        ], BUTTON_CLASS);
     }
 
-    function setupEvents() {
-        const updateCounter = () => {
-            counterDiv.innerText = `已選擇 ${table.getSelectedRows().length} 列`;
-        };
+    function bindTableEvents(activeTable) {
+        utils.bindSelectionState(activeTable, COUNTER_ID, hoveredState);
+    }
 
-        table.on('rowMouseEnter', (e, row) => {
-            hoveredRow = row;
-            row.getElement().classList.add('hover-highlight');
-        });
+    function bindKeyboardOnce() {
+        if (keydownBound) return;
+        keydownBound = true;
 
-        table.on('rowMouseLeave', (e, row) => {
-            hoveredRow = null;
-            row.getElement().classList.remove('hover-highlight');
-        });
-
-        table.on('rowSelected', (row) => {
-            row.getElement().classList.add('selected-highlight');
-            updateCounter();
-        });
-
-        table.on('rowDeselected', (row) => {
-            row.getElement().classList.remove('selected-highlight');
-            updateCounter();
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (isEditing(e)) return;
+        document.addEventListener("keydown", (e) => {
+            table = getTable();
+            if (!table || utils.isEditingEvent(e)) return;
 
             const isMod = e.metaKey || e.ctrlKey;
+            const key = e.key.toLowerCase();
 
-            if (e.key === 'Enter' && hoveredRow) {
+            if (e.key === "Enter" && hoveredState.current) {
                 e.preventDefault();
-                hoveredRow.toggleSelect();
+                hoveredState.current.toggleSelect();
+                return;
             }
 
-            if (isMod) {
-                const key = e.key.toLowerCase();
-                switch (key) {
-                    case 'a':
-                        e.preventDefault();
-                        smartConditionSelectAndAdjustBid();
-                        break;
-                    case 'arrowup':
-                        e.preventDefault();
-                        moveSelection(-1);
-                        break;
-                    case 'arrowdown':
-                        e.preventDefault();
-                        moveSelection(1);
-                        break;
-                    case 'e': {
-                        e.preventDefault();
-                        const activeRows = table.getRows('active');
-                        const selectedActiveCount = activeRows.filter((r) => r.isSelected()).length;
-                        selectedActiveCount > 0 ? table.deselectRow(activeRows) : table.selectRow(activeRows);
-                        break;
-                    }
-                    case 'f':
-                        e.preventDefault();
-                        keywordSmartSelect();
-                        break;
-                    case 'b':
-                        e.preventDefault();
-                        table.deselectRow();
-                        table.getRows().forEach((r) => {
-                            r.getElement().style.backgroundColor = '';
-                        });
-                        break;
-                    case 's':
-                        e.preventDefault();
-                        table.download('xlsx', 'filtered_table.xlsx', { sheetName: 'Data' });
-                        break;
-                    case '1':
-                    case '2':
-                    case '3':
-                    case '4': {
-                        e.preventDefault();
-                        const colIdx = key === '4' ? 2 : 1;
-                        const optIdx = key === '4' ? 0 : parseInt(key, 10) - 1;
-                        openHeaderMenu(colIdx, optIdx);
-                        break;
-                    }
-                    case 'x':
-                        e.preventDefault();
-                        openHeaderMenu(3, 0);
-                        break;
+            if (!isMod) return;
+
+            switch (key) {
+                case "a":
+                    e.preventDefault();
+                    smartConditionSelectAndAdjustBid();
+                    break;
+                case "arrowup":
+                    e.preventDefault();
+                    moveSelection(-1);
+                    break;
+                case "arrowdown":
+                    e.preventDefault();
+                    moveSelection(1);
+                    break;
+                case "e": {
+                    e.preventDefault();
+                    const activeRows = table.getRows("active");
+                    const selectedActiveCount = activeRows.filter((r) => r.isSelected()).length;
+                    selectedActiveCount > 0 ? table.deselectRow(activeRows) : table.selectRow(activeRows);
+                    break;
                 }
+                case "f":
+                    e.preventDefault();
+                    keywordSmartSelect();
+                    break;
+                case "b":
+                    e.preventDefault();
+                    table.deselectRow();
+                    break;
+                case "s":
+                    e.preventDefault();
+                    table.download("xlsx", "filtered_table.xlsx", { sheetName: "Data" });
+                    break;
+                case "1":
+                case "2":
+                case "3":
+                case "4": {
+                    e.preventDefault();
+                    const colIdx = key === "4" ? 2 : 1;
+                    const optIdx = key === "4" ? 0 : parseInt(key, 10) - 1;
+                    openHeaderMenu(colIdx, optIdx);
+                    break;
+                }
+                case "x":
+                    e.preventDefault();
+                    openHeaderMenu(3, 0);
+                    break;
             }
         });
     }
 
     async function smartConditionSelectAndAdjustBid() {
+        table = getTable();
+        if (!table) return;
+
         table.deselectRow();
-        const activeRows = table.getRows('active');
+        const activeRows = table.getRows("active");
         const targetRows = [];
 
         activeRows.forEach((row) => {
@@ -226,14 +211,11 @@
         });
 
         if (targetRows.length === 0) {
-            console.log('沒有符合條件（含銷量 > 0）的關鍵字');
+            console.log("沒有符合條件（含銷量 > 0）的關鍵字");
             return;
         }
 
-        const header = document.querySelector(".tabulator-col[tabulator-field='checkBox'] .tabulator-col-sorter");
-        if (header) header.click();
-
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sortByCheckBox();
         scrollFirstSelectedToTop();
 
         let processedCount = 0;
@@ -243,27 +225,27 @@
             const newBid = Math.min(1, cpcVal).toFixed(2);
 
             const rowEl = row.getElement();
-            const bidInput = rowEl.querySelector('input[name="bid_fixed_value"]');
-            const saveBtn = rowEl.querySelector('button.save-bid-button[type="submit"]');
+            const bidInput = rowEl?.querySelector('input[name="bid_fixed_value"]');
+            const saveBtn = rowEl?.querySelector('button.save-bid-button[type="submit"]');
 
-            if (bidInput && saveBtn) {
-                bidInput.value = newBid;
-                bidInput.dispatchEvent(new Event('input', { bubbles: true }));
-                bidInput.dispatchEvent(new Event('change', { bubbles: true }));
+            if (!bidInput || !saveBtn) continue;
 
-                bidInput.style.backgroundColor = '#c8e6c9';
-
-                saveBtn.click();
-                processedCount++;
-
-                await new Promise((resolve) => setTimeout(resolve, 200));
-            }
+            bidInput.value = newBid;
+            bidInput.dispatchEvent(new Event("input", { bubbles: true }));
+            bidInput.dispatchEvent(new Event("change", { bubbles: true }));
+            bidInput.style.backgroundColor = "#c8e6c9";
+            saveBtn.click();
+            processedCount++;
+            await utils.wait(200);
         }
 
         console.log(`✅ 已完成 ${processedCount} 筆含銷量關鍵字的自動優化`);
     }
 
     function moveSelection(direction) {
+        table = getTable();
+        if (!table) return;
+
         const selected = table.getSelectedRows();
         if (selected.length === 0) return;
 
@@ -271,17 +253,20 @@
             ? selected[selected.length - 1].getNextRow()
             : selected[0].getPrevRow();
 
-        if (targetRow) {
-            table.deselectRow();
-            targetRow.select();
-            targetRow.getElement().scrollIntoView({ block: 'center', behavior: 'smooth' });
-        }
+        if (!targetRow) return;
+
+        table.deselectRow();
+        targetRow.select();
+        targetRow.getElement()?.scrollIntoView({ block: "center", behavior: "smooth" });
     }
 
-    function keywordSmartSelect() {
+    async function keywordSmartSelect() {
+        table = getTable();
+        if (!table) return;
+
         table.deselectRow();
-        table.getRows('active').forEach((row) => {
-            const kw = row.getData().keyword || '';
+        table.getRows("active").forEach((row) => {
+            const kw = row.getData().keyword || "";
             const words = kw.trim().split(/\s+/);
 
             if (words.length >= 3) {
@@ -289,34 +274,51 @@
             }
         });
 
-        const header = document.querySelector(".tabulator-col[tabulator-field='checkBox'] .tabulator-col-sorter");
-        if (header) header.click();
-
-        setTimeout(scrollFirstSelectedToTop, 300);
+        await sortByCheckBox();
+        utils.scrollFirstSelectedToTop(table);
     }
 
     function openHeaderMenu(colIdx, optIdx) {
-        const buttons = document.querySelectorAll('.tabulator-header-popup-button');
-        if (buttons[colIdx]) {
-            buttons[colIdx].click();
-            setTimeout(() => {
-                const items = document.querySelectorAll('.tabulator-menu-item');
-                if (items[optIdx]) items[optIdx].click();
-            }, 200);
-        }
+        const buttons = document.querySelectorAll(".tabulator-header-popup-button");
+        if (!buttons[colIdx]) return;
+
+        buttons[colIdx].click();
+        setTimeout(() => {
+            const items = document.querySelectorAll(".tabulator-menu-item");
+            if (items[optIdx]) items[optIdx].click();
+        }, 200);
+    }
+
+    async function sortByCheckBox() {
+        table = getTable();
+        if (!table) return;
+        await utils.sortByField(table, "checkBox", "desc");
     }
 
     function scrollFirstSelectedToTop() {
+        table = getTable();
+        if (!table) return;
+
         const selected = table.getSelectedRows()[0];
         if (selected) {
-            table.scrollToRow(selected, 'top', false);
+            table.scrollToRow(selected, "top", false);
+        }
+        updateCounter();
+    }
+
+    function updateCounter() {
+        const counterDiv = document.getElementById(COUNTER_ID);
+        if (counterDiv && table) {
+            counterDiv.innerText = `已選擇 ${table.getSelectedRows().length} 列`;
         }
     }
 
-    const checkTabulator = setInterval(() => {
-        if (typeof Tabulator !== 'undefined' && Tabulator.findTable('#keywords-table').length > 0) {
-            clearInterval(checkTabulator);
-            init();
-        }
-    }, 500);
+    function startInitObserver() {
+        if (observerStarted) return;
+        observerStarted = true;
+
+        utils.startInitObserver(init);
+    }
+
+    startInitObserver();
 })();
