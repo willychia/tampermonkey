@@ -10,8 +10,8 @@ Shared helper utilities for the Tabulator-based Tampermonkey scripts.
 
 ## Used By
 
-- `ads/product_targeting_page/product_targeting_page.js`
-- `ads/keyword_targeting_page/keyword_targeting_page.js`
+- `ads/product_targeting_page/product_targeting_page.user.js`
+- `ads/keyword_targeting_page/keyword_targeting_page.user.js`
 
 ## Provided Helpers
 

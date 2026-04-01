@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Product Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.01.8
+// @version      2026.04.01.9
 // @description  Product Targeting 加強版：Cmd+A 自動調價、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
@@ -16,6 +16,7 @@
     "use strict";
 
     const SELECTOR = "#targets-table";
+    // 在表格實例上標記初始化狀態，避免 SPA 切頁後重複綁同一套增強邏輯。
     const TABLE_FLAG = "__ptp_enhanced_bound";
     const COUNTER_ID = "selection-counter";
     const ASIN_BOX_ID = "asin-filter-box";
@@ -72,6 +73,7 @@
 
     function setupColumns(activeTable) {
         const columns = activeTable.getColumnDefinitions();
+        // 第一欄補上 field 名稱後，才能把已選取列排到最上面。
         if (columns.length > 0) columns[0].field = "checkBox";
 
         const enhancedCols = columns.map((col) => {
@@ -92,6 +94,7 @@
                     headerFilterFunc: (filterValue, cellValue) => {
                         const v = parseFloat(filterValue);
                         if (!Number.isFinite(v) || !cellValue) return true;
+                        // 將絕對時間換算成距今小時數，方便直接用相對條件過濾 Buy Box 資料。
                         const hours = (Date.now() - new Date(cellValue).getTime()) / 36e5;
                         return hours <= v;
                     }
@@ -114,6 +117,7 @@
         ], BUTTON_CLASS);
 
         if (!document.getElementById(ASIN_BOX_ID)) {
+            // 建立一個常駐的小工具面板，讓貼上 ASIN 後能直接批次勾選。
             const container = document.createElement("div");
             container.id = ASIN_BOX_ID;
             container.innerHTML = `
@@ -150,6 +154,7 @@
 
             if (!isMod) return;
 
+            // 保留頁面常用快捷操作，讓產品投放頁能快速做批次勾選與匯出。
             switch (key) {
                 case "a":
                     e.preventDefault();
@@ -209,6 +214,7 @@
             const bidVal = parseFloat(parseFloat(data.bid || 0).toFixed(2));
             const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
 
+            // 用相同商業條件挑出值得加價的 target，再統一執行儲存。
             if (daysOfSupply > 7 && acos <= 0.1 && unitsSold > 0 && bidVal < cpcVal) {
                 row.select();
                 targetRows.push(row);
@@ -235,6 +241,7 @@
 
             if (!bidInput || !saveBtn) continue;
 
+            // 透過事件模擬通知前端狀態已更新，避免只改 value 卻沒有觸發儲存邏輯。
             bidInput.value = newBid;
             bidInput.dispatchEvent(new Event("input", { bubbles: true }));
             bidInput.dispatchEvent(new Event("change", { bubbles: true }));
@@ -254,6 +261,7 @@
         const text = document.getElementById("asin-input")?.value.trim();
         if (!text) return;
 
+        // 接受換行、空白、逗號混合貼上的格式，先標準化成 ASIN 集合。
         const asinSet = new Set(
             text
                 .split(/[\s,]+/)
@@ -269,6 +277,7 @@
             const rowEl = row.getElement();
             let asin = (data.match_expression_value || "").toUpperCase();
 
+            // 若資料欄位沒有 ASIN，就退回從畫面上的連結文字擷取。
             if (!asin && rowEl) {
                 const asinLink = rowEl.querySelector('a[href*="asin:"]');
                 asin = asinLink ? asinLink.textContent.trim().toUpperCase() : "";
@@ -339,6 +348,7 @@
         if (observerStarted) return;
         observerStarted = true;
 
+        // 表格由前端動態生成時，重新跑 init 以確保 UI 與事件都被補上。
         utils.startInitObserver(SELECTOR, init);
     }
 
