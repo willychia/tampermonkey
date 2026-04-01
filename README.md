@@ -13,6 +13,15 @@ Tampermonkey scripts for Hourloop Amazon Ads admin pages.
 - `ads/shared/tabulator_page_utils.js`
   Shared helper utilities used by the Tabulator-based page scripts.
 
+## Chinese Docs
+
+- `ads/product_targeting_page/product_targeting_page_zh.md`
+  中文說明：Product Targeting 頁面腳本
+- `ads/keyword_targeting_page/keyword_targeting_page_zh.md`
+  中文說明：Keyword Targeting 頁面腳本
+- `ads/ad_group_page/ad_group_page_zh.md`
+  中文說明：Ad Group 頁面腳本
+
 ## Install Links
 
 - Product Targeting: `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.user.js`
