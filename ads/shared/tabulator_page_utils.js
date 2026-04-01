@@ -1,6 +1,7 @@
 (function () {
     "use strict";
 
+    // 避免共用工具在同一頁被重複掛載，造成事件或方法覆寫。
     if (window.TMTabulatorPageUtils) return;
 
     const pageWindow = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
@@ -54,6 +55,7 @@
     }
 
     function bindSelectionState(activeTable, counterId, hoveredState) {
+        // 將列 hover 與 selected 狀態統一集中處理，讓各頁腳本共用同一套視覺回饋。
         const update = () => {
             const counterDiv = document.getElementById(counterId);
             if (counterDiv) {
@@ -83,6 +85,7 @@
     }
 
     async function sortByField(activeTable, field, dir) {
+        // Tabulator 在某些情況下排序是非同步的，這裡統一等待排序完成再往下執行。
         const result = activeTable.setSort(field, dir);
         if (result && typeof result.then === "function") {
             await result;
@@ -122,6 +125,7 @@
         };
 
         const observer = new MutationObserver((mutations) => {
+            // Tabulator 表格常會被前端框架重建，偵測到相關 DOM 變動時重新初始化即可。
             if (mutationsTouchSelector(mutations, selector)) {
                 scheduleInit();
             }

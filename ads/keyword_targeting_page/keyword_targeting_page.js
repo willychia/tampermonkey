@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Keyword Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.01.6
+// @version      2026.04.01.7
 // @description  Cmd+A 條件勾選並自動更新 Bid 為 Min(1, CPC)
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
@@ -16,6 +16,7 @@
     "use strict";
 
     const SELECTOR = "#keywords-table";
+    // 用旗標記錄這個 Tabulator 實例是否已完成增強設定，避免重複 setColumns/綁事件。
     const TABLE_FLAG = "__ktp_enhanced_bound";
     const COUNTER_ID = "selection-counter";
     const BUTTON_CLASS = "custom-float-btn";
@@ -67,6 +68,7 @@
 
     function setupColumns(activeTable) {
         const columns = activeTable.getColumnDefinitions();
+        // 讓第一欄 checkbox 具備固定 field，後續才能用來排序已選取資料。
         if (columns.length > 0) columns[0].field = "checkBox";
 
         const enhancedCols = columns.map((col) => {
@@ -88,6 +90,7 @@
                     headerFilterFunc: (filterValue, cellValue) => {
                         const v = parseFloat(filterValue);
                         if (!Number.isFinite(v) || !cellValue) return true;
+                        // 將日期欄位轉成距今幾小時/幾天，讓表頭可以直接輸入相對時間篩選。
                         const diff = (Date.now() - new Date(cellValue).getTime()) / 36e5;
                         return (isDay ? diff / 24 : diff) <= v;
                     }
@@ -133,6 +136,7 @@
 
             if (!isMod) return;
 
+            // 將常用的批次操作綁到鍵盤，減少反覆滑鼠操作。
             switch (key) {
                 case "a":
                     e.preventDefault();
@@ -205,6 +209,7 @@
                 unitsSold > 0 &&
                 bidVal < cpcVal;
 
+            // 只挑出庫存健康、表現不差且 bid 仍有上調空間的列。
             if (isGoodPerformance) {
                 row.select();
                 targetRows.push(row);
@@ -231,6 +236,7 @@
 
             if (!bidInput || !saveBtn) continue;
 
+            // 手動觸發 input/change，確保頁面框架能正確感知 bid 已被修改。
             bidInput.value = newBid;
             bidInput.dispatchEvent(new Event("input", { bubbles: true }));
             bidInput.dispatchEvent(new Event("change", { bubbles: true }));
@@ -270,6 +276,7 @@
             const kw = row.getData().keyword || "";
             const words = kw.trim().split(/\s+/);
 
+            // 這裡用詞數快速抓出較長尾、通常更值得集中檢查的關鍵字。
             if (words.length >= 3) {
                 row.select();
             }
@@ -318,6 +325,7 @@
         if (observerStarted) return;
         observerStarted = true;
 
+        // 共用 observer 會在表格被 SPA 重建時重新執行 init。
         utils.startInitObserver(SELECTOR, init);
     }
 

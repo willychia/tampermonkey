@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ad Group Page Additional Functions (Optimized V8)
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.01.4
+// @version      2026.04.01.5
 // @description  修正跳頂問題、優化選取邏輯、強化捲軸位置保持。
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.user.js
@@ -14,6 +14,7 @@
     "use strict";
 
     const SELECTOR = "#ad-groups-table";
+    // 在 Tabulator 實例上打旗標，避免同一張表被重複修補欄位與綁事件。
     const TABLE_FLAG = "__agp_stable_v9";
     let table = null;
     let uiBoundTable = null;
@@ -87,6 +88,7 @@
         if (!table) return;
 
         if (!table[TABLE_FLAG]) {
+            // 某些 Tabulator 欄位定義是動態生成的，初始化後再補強比較穩定。
             patchFirstColumn(table);
             resizeImageColumn(table);
             table[TABLE_FLAG] = true;
@@ -99,6 +101,7 @@
     function patchFirstColumn(activeTable) {
         try {
             const firstCol = activeTable.getColumns()[0];
+            // 第一欄原本是無 field 的 checkbox 欄，補上欄位名後才能拿來排序。
             if (firstCol && !firstCol.getField()) {
                 firstCol.getDefinition().field = "checkBox";
             }
@@ -133,6 +136,7 @@
         }
 
         if (uiBoundTable !== activeTable) {
+            // 只在表格實例切換時重綁事件，避免 SPA 反覆 init 導致計數器重複更新。
             activeTable.on("rowSelectionChanged", () => updateCounter(activeTable));
             uiBoundTable = activeTable;
         }
@@ -155,6 +159,7 @@
         if (!activeTable) return;
 
         const holder = activeTable.element.querySelector(".tabulator-tableholder");
+        // 勾選與排序都可能改變畫面位置，先記住捲動位置，最後再還原。
         const savedPos = holder ? holder.scrollTop : 0;
         const val = document.getElementById("agp-asin-area")?.value || "";
         const set = new Set(val.split(/[\s,]+/).map((s) => s.trim().toUpperCase()).filter(Boolean));
@@ -201,6 +206,7 @@
         const isCmd = e.metaKey || e.ctrlKey;
         const key = e.key.toLowerCase();
 
+        // 攔截常用快捷鍵，改成對目前表格執行批次操作。
         if (isCmd && ["1", "2", "3", "4", "5", "6", "x", "g", "e", "b", "d"].includes(key)) {
             e.preventDefault();
             e.stopImmediatePropagation();
@@ -288,6 +294,7 @@
                 requestAnimationFrame(startObserving);
                 return;
             }
+            // 頁面是動態渲染的，所以用 observer 等表格出現或被重建時再補強功能。
             observer.observe(document.body, { childList: true, subtree: true });
             scheduleInit();
         };
