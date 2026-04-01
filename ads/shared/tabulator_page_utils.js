@@ -3,6 +3,8 @@
 
     if (window.TMTabulatorPageUtils) return;
 
+    const pageWindow = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
+
     function wait(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
@@ -15,8 +17,9 @@
     }
 
     function getTableBySelector(selector) {
-        if (typeof window.Tabulator === "undefined" || !window.Tabulator.findTable) return null;
-        return window.Tabulator.findTable(selector)[0] || null;
+        const tabulator = pageWindow?.Tabulator;
+        if (typeof tabulator === "undefined" || !tabulator.findTable) return null;
+        return tabulator.findTable(selector)[0] || null;
     }
 
     function sameRow(rowA, rowB) {

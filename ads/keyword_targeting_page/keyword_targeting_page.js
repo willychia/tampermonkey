@@ -9,6 +9,7 @@
 // @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/keyword_targeting_page/keyword_targeting_page.js
 // @require      https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/shared/tabulator_page_utils.js
 // @grant        GM_addStyle
+// @grant        unsafeWindow
 // ==/UserScript==
 
 (function () {

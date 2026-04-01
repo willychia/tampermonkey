@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Product Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.01.2
+// @version      2026.04.01.4
 // @description  Product Targeting 加強版：Cmd+A 自動調價、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
@@ -9,6 +9,7 @@
 // @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.js
 // @require      https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/shared/tabulator_page_utils.js
 // @grant        GM_addStyle
+// @grant        unsafeWindow
 // ==/UserScript==
 
 (function () {
