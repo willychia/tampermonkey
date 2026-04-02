@@ -1,11 +1,21 @@
 (function () {
     "use strict";
 
+    // -----------------------------
+    // 模組初始化
+    // -----------------------------
+    // 這個檔案提供多個頁面共用的 Tabulator 小工具，
+    // 掛在 window 上之後就能被各個 userscript 重複使用。
     // 避免共用工具在同一頁被重複掛載，造成事件或方法覆寫。
     if (window.TMTabulatorPageUtils) return;
 
     const pageWindow = typeof unsafeWindow !== "undefined" ? unsafeWindow : window;
 
+    // -----------------------------
+    // 基礎工具
+    // -----------------------------
+    // 這些方法主要處理延遲等待與編輯狀態判斷，
+    // 讓鍵盤快捷鍵不會干擾使用者在輸入元件內的操作。
     function wait(ms) {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
@@ -23,6 +33,11 @@
         return tabulator.findTable(selector)[0] || null;
     }
 
+    // -----------------------------
+    // DOM 與狀態比對
+    // -----------------------------
+    // 這一段用來穩定判斷兩個 row 是否為同一列，
+    // 並在需要時建立共用的計數器與浮動按鈕。
     function sameRow(rowA, rowB) {
         return rowA && rowB && rowA.getElement && rowB.getElement && rowA.getElement() === rowB.getElement();
     }
@@ -54,6 +69,11 @@
         });
     }
 
+    // -----------------------------
+    // 表格互動綁定
+    // -----------------------------
+    // 將 hover、選取與計數器更新集中管理，
+    // 讓各頁只要呼叫一次就能取得一致的互動效果。
     function bindSelectionState(activeTable, counterId, hoveredState) {
         // 將列 hover 與 selected 狀態統一集中處理，讓各頁腳本共用同一套視覺回饋。
         const update = () => {
@@ -84,6 +104,11 @@
         });
     }
 
+    // -----------------------------
+    // 排序與定位
+    // -----------------------------
+    // 這些 helper 用來在批次勾選或排序後，
+    // 將畫面快速定位回使用者最需要看的列。
     async function sortByField(activeTable, field, dir) {
         // Tabulator 在某些情況下排序是非同步的，這裡統一等待排序完成再往下執行。
         const result = activeTable.setSort(field, dir);
@@ -105,6 +130,11 @@
         return node.matches(selector) || Boolean(node.querySelector(selector));
     }
 
+    // -----------------------------
+    // DOM 變動監聽
+    // -----------------------------
+    // Hourloop 頁面常常會由前端框架重新渲染表格，
+    // 因此需要透過 MutationObserver 在表格重建時自動重新初始化。
     function mutationsTouchSelector(mutations, selector) {
         return mutations.some((mutation) => {
             if (nodeTouchesSelector(mutation.target, selector)) return true;
@@ -144,6 +174,11 @@
         return observer;
     }
 
+    // -----------------------------
+    // 對外匯出
+    // -----------------------------
+    // 將共用方法統一掛到全域，
+    // 讓頁面腳本只需透過 window.TMTabulatorPageUtils 存取。
     window.TMTabulatorPageUtils = {
         bindSelectionState,
         ensureButtons,

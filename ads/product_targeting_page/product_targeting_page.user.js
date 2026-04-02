@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Product Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.01.9
+// @version      2026.04.02.1
 // @description  Product Targeting 加強版：Cmd+A 自動調價、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
@@ -15,6 +15,11 @@
 (function () {
     "use strict";
 
+    // -----------------------------
+    // 基本設定與狀態
+    // -----------------------------
+    // 這裡定義產品投放頁面所需的 selector、UI 元件 id 與共用狀態，
+    // 讓整份腳本在重複初始化時仍能維持一致行為。
     const SELECTOR = "#targets-table";
     // 在表格實例上標記初始化狀態，避免 SPA 切頁後重複綁同一套增強邏輯。
     const TABLE_FLAG = "__ptp_enhanced_bound";
@@ -31,6 +36,11 @@
     let keydownBound = false;
     let observerStarted = false;
 
+    // -----------------------------
+    // UI 樣式
+    // -----------------------------
+    // 這段負責注入 hover、selected、計數器、浮動按鈕與 ASIN 面板樣式，
+    // 讓常用工具固定出現在畫面上且容易辨識。
     GM_addStyle(`
         .hover-highlight { border: 3px solid red !important; }
         .selected-highlight { border: 3px solid yellow !important; }
@@ -52,6 +62,11 @@
         }
     `);
 
+    // -----------------------------
+    // 取得表格與初始化
+    // -----------------------------
+    // 每次表格出現或被前端重建時，都會從 init 進入，
+    // 先補強欄位，再綁定互動與建立浮動 UI。
     function getTable() {
         return utils.getTableBySelector(SELECTOR);
     }
@@ -71,6 +86,11 @@
         updateCounter();
     }
 
+    // -----------------------------
+    // 欄位增強
+    // -----------------------------
+    // 這一段替 checkbox、庫存與 Buy Box 時間欄位補上更適合操作的定義，
+    // 讓勾選排序與表頭篩選可以直接使用。
     function setupColumns(activeTable) {
         const columns = activeTable.getColumnDefinitions();
         // 第一欄補上 field 名稱後，才能把已選取列排到最上面。
@@ -107,6 +127,11 @@
         activeTable.setColumns(enhancedCols);
     }
 
+    // -----------------------------
+    // 浮動 UI 與 ASIN 工具面板
+    // -----------------------------
+    // 建立選取計數器、上下捲動與群組操作按鈕，
+    // 並提供一個可直接貼入 ASIN 做批次勾選的小面板。
     function setupUI() {
         utils.ensureCounter(COUNTER_ID, table ? `已選擇 ${table.getSelectedRows().length} 列` : "已選擇 0 列");
         utils.ensureButtons([
@@ -135,6 +160,11 @@
         utils.bindSelectionState(activeTable, COUNTER_ID, hoveredState);
     }
 
+    // -----------------------------
+    // 鍵盤快捷鍵
+    // -----------------------------
+    // 這裡統一管理本頁常用快捷鍵，
+    // 包含自動調價、全選/取消、匯出、上下移動與表頭選單。
     function bindKeyboardOnce() {
         if (keydownBound) return;
         keydownBound = true;
@@ -198,6 +228,11 @@
         });
     }
 
+    // -----------------------------
+    // 自動調價流程
+    // -----------------------------
+    // Cmd/Ctrl + A 會篩出值得加價的 product target，
+    // 並逐筆把 bid 更新成 min(1, CPC) 後觸發儲存。
     async function smartConditionSelectAndSave() {
         table = getTable();
         if (!table) return;
@@ -254,6 +289,11 @@
         console.log(`已儲存 ${count} 筆自動優化資料`);
     }
 
+    // -----------------------------
+    // ASIN 批次勾選
+    // -----------------------------
+    // 這段負責解析使用者貼上的 ASIN 清單，
+    // 再從資料欄位或畫面連結中抓出 ASIN 進行比對與勾選。
     async function applyAsinFilter() {
         table = getTable();
         if (!table) return;
@@ -294,6 +334,11 @@
         console.log(`共勾選 ${count} 筆符合 ASIN 的資料`);
     }
 
+    // -----------------------------
+    // 單列移動與表頭選單
+    // -----------------------------
+    // 這些 helper 讓鍵盤操作可以快速在相鄰列之間切換，
+    // 或直接呼叫 Tabulator 表頭選單的既有功能。
     function moveSelection(direction) {
         table = getTable();
         if (!table) return;
@@ -326,6 +371,11 @@
         await utils.sortByField(table, "checkBox", "desc");
     }
 
+    // -----------------------------
+    // 定位、計數器與重建監聽
+    // -----------------------------
+    // 排序或勾選完成後會把畫面捲到第一筆已選資料，
+    // 並透過 observer 在 SPA 重建後重新套用整套功能。
     function scrollFirstSelectedToTop() {
         table = getTable();
         if (!table) return;
@@ -352,5 +402,10 @@
         utils.startInitObserver(SELECTOR, init);
     }
 
+    // -----------------------------
+    // 啟動入口
+    // -----------------------------
+    // 啟動 observer 後，就能在頁面第一次載入與後續重渲染時，
+    // 自動替產品投放表格補上所有增強功能。
     startInitObserver();
 })();

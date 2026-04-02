@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Keyword Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.01.8
+// @version      2026.04.02.1
 // @description  Cmd+A 條件勾選並自動更新 Bid 為 Min(1, CPC)
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
@@ -15,6 +15,11 @@
 (function () {
     "use strict";
 
+    // -----------------------------
+    // 基本設定與狀態
+    // -----------------------------
+    // 這裡集中定義表格 selector、初始化旗標與畫面互動所需的共用狀態，
+    // 讓後續函式能透過同一份資料來源協作。
     const SELECTOR = "#keywords-table";
     // 用旗標記錄這個 Tabulator 實例是否已完成增強設定，避免重複 setColumns/綁事件。
     const TABLE_FLAG = "__ktp_enhanced_bound";
@@ -30,6 +35,11 @@
     let keydownBound = false;
     let observerStarted = false;
 
+    // -----------------------------
+    // UI 樣式
+    // -----------------------------
+    // 這裡注入共用的 hover、selected、計數器與浮動按鈕樣式，
+    // 讓使用者能快速辨識目前選取狀態與可用操作。
     GM_addStyle(`
         .hover-highlight { border: 3px solid red !important; }
         .selected-highlight { border: 3px solid yellow !important; }
@@ -47,6 +57,11 @@
         .custom-float-btn:hover { background: black; }
     `);
 
+    // -----------------------------
+    // 取得表格與初始化
+    // -----------------------------
+    // 主初始化流程會在表格出現時補上欄位設定、事件與 UI，
+    // 並確保相同表格不會被重複綁定。
     function getTable() {
         return utils.getTableBySelector(SELECTOR);
     }
@@ -66,6 +81,11 @@
         updateCounter();
     }
 
+    // -----------------------------
+    // 欄位增強
+    // -----------------------------
+    // 這裡替特定欄位補上更實用的 header filter，
+    // 讓庫存、Buy Box 時間與建立時間可以直接用相對條件篩選。
     function setupColumns(activeTable) {
         const columns = activeTable.getColumnDefinitions();
         // 讓第一欄 checkbox 具備固定 field，後續才能用來排序已選取資料。
@@ -103,6 +123,11 @@
         activeTable.setColumns(enhancedCols);
     }
 
+    // -----------------------------
+    // 浮動 UI
+    // -----------------------------
+    // 建立選取計數器與上下捲動、展開收合群組按鈕，
+    // 讓常見動作不需要每次都靠原生頁面操作。
     function setupUI() {
         utils.ensureCounter(COUNTER_ID, table ? `已選擇 ${table.getSelectedRows().length} 列` : "已選擇 0 列");
         utils.ensureButtons([
@@ -117,6 +142,11 @@
         utils.bindSelectionState(activeTable, COUNTER_ID, hoveredState);
     }
 
+    // -----------------------------
+    // 鍵盤快捷鍵
+    // -----------------------------
+    // 這一段統一攔截本頁最常用的快捷鍵，
+    // 包含自動調價、長尾關鍵字勾選、匯出與表頭選單操作。
     function bindKeyboardOnce() {
         if (keydownBound) return;
         keydownBound = true;
@@ -187,6 +217,11 @@
         });
     }
 
+    // -----------------------------
+    // 自動調價流程
+    // -----------------------------
+    // Cmd/Ctrl + A 會依商業條件篩選出值得調價的關鍵字，
+    // 接著逐列改寫 bid、觸發前端事件並送出儲存。
     async function smartConditionSelectAndAdjustBid() {
         table = getTable();
         if (!table) return;
@@ -249,6 +284,11 @@
         console.log(`✅ 已完成 ${processedCount} 筆含銷量關鍵字的自動優化`);
     }
 
+    // -----------------------------
+    // 單列移動與長尾關鍵字勾選
+    // -----------------------------
+    // 這兩個功能分別負責用鍵盤移動目前選取列，
+    // 與快速找出字數較多、通常更值得人工檢查的長尾關鍵字。
     function moveSelection(direction) {
         table = getTable();
         if (!table) return;
@@ -286,6 +326,11 @@
         utils.scrollFirstSelectedToTop(table);
     }
 
+    // -----------------------------
+    // 表頭選單、排序與定位
+    // -----------------------------
+    // 這一段負責觸發 Tabulator 內建選單，
+    // 並在批次操作後把已選列排到前方、捲回可視位置。
     function openHeaderMenu(colIdx, optIdx) {
         const buttons = document.querySelectorAll(".tabulator-header-popup-button");
         if (!buttons[colIdx]) return;
@@ -303,6 +348,11 @@
         await utils.sortByField(table, "checkBox", "desc");
     }
 
+    // -----------------------------
+    // 計數器與重建監聽
+    // -----------------------------
+    // 計數器會在每次選取狀態變動後更新，
+    // observer 則會在 SPA 重建表格後重新呼叫 init。
     function scrollFirstSelectedToTop() {
         table = getTable();
         if (!table) return;
@@ -329,5 +379,10 @@
         utils.startInitObserver(SELECTOR, init);
     }
 
+    // -----------------------------
+    // 啟動入口
+    // -----------------------------
+    // 腳本載入後立即啟用 observer，
+    // 讓後續不論表格何時出現都能自動套用增強功能。
     startInitObserver();
 })();

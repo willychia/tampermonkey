@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ad Group Page Additional Functions (Optimized V8)
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.01.6
+// @version      2026.04.02.1
 // @description  修正跳頂問題、優化選取邏輯、強化捲軸位置保持。
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.user.js
@@ -13,6 +13,11 @@
 (function () {
     "use strict";
 
+    // -----------------------------
+    // 基本設定與狀態
+    // -----------------------------
+    // 這一段集中管理表格 selector、初始化旗標與執行期間需要追蹤的狀態，
+    // 方便後續各功能共用同一份表格參考。
     const SELECTOR = "#ad-groups-table";
     // 在 Tabulator 實例上打旗標，避免同一張表被重複修補欄位與綁事件。
     const TABLE_FLAG = "__agp_stable_v9";
@@ -20,6 +25,11 @@
     let uiBoundTable = null;
     let observerStarted = false;
 
+    // -----------------------------
+    // 基礎工具函式
+    // -----------------------------
+    // 這些小工具負責判斷使用者是否正在輸入，
+    // 並提供等待、抓表格與偵測目標 DOM 是否被重建的能力。
     const isEditing = (e) => {
         const target = e.target;
         const tag = target?.tagName || "";
@@ -45,6 +55,11 @@
         });
     }
 
+    // -----------------------------
+    // 樣式注入
+    // -----------------------------
+    // 這裡統一覆寫選取列、hover 列與浮動面板的樣式，
+    // 讓腳本功能啟用後能立刻提供穩定的視覺回饋。
     const injectCSS = () => {
         if (document.getElementById("agp-v8-css")) return;
         const s = document.createElement("style");
@@ -83,6 +98,11 @@
         document.head.appendChild(s);
     };
 
+    // -----------------------------
+    // 主初始化流程
+    // -----------------------------
+    // 每次偵測到表格出現或重建時，都從這裡進入，
+    // 先補強欄位定義，再建立 UI 與事件綁定。
     function initEnhancements() {
         table = getTable();
         if (!table) return;
@@ -98,6 +118,11 @@
         setupUI(table);
     }
 
+    // -----------------------------
+    // 表格欄位補強
+    // -----------------------------
+    // Ad Group 頁面有些欄位定義是動態產生的，
+    // 這裡會補上 checkbox 欄位名稱與調整圖片欄寬度，讓排序與顯示更穩定。
     function patchFirstColumn(activeTable) {
         try {
             const firstCol = activeTable.getColumns()[0];
@@ -118,6 +143,11 @@
         activeTable.getRows().forEach((row) => row.normalizeHeight?.());
     }
 
+    // -----------------------------
+    // 浮動面板與計數器
+    // -----------------------------
+    // 這一段建立右上角操作面板，提供選取數量顯示、
+    // Cmd+G 預設筆數輸入，以及 ASIN / ad group name 批次勾選功能。
     function setupUI(activeTable) {
         let panel = document.getElementById("agp-panel");
         if (!panel) {
@@ -154,6 +184,11 @@
         if (countSpan) countSpan.textContent = String(activeTable.getSelectedRows().length);
     }
 
+    // -----------------------------
+    // 批次勾選邏輯
+    // -----------------------------
+    // 這裡會把貼上的文字拆成集合，並同時比對 ASIN 與 ad group name，
+    // 勾選完成後再把已選列排到前面，同時盡量維持原本捲動位置。
     async function applyBatchSelection() {
         const activeTable = getTable();
         if (!activeTable) return;
@@ -184,6 +219,11 @@
         updateCounter(activeTable);
     }
 
+    // -----------------------------
+    // 表頭選單觸發
+    // -----------------------------
+    // 用統一方法模擬點擊 Tabulator 表頭選單，
+    // 讓快捷鍵可以直接呼叫既有的欄位操作。
     function clickHeaderMenu(buttonIndex, itemIndex) {
         const btns = document.querySelectorAll(".tabulator-col .tabulator-header-popup-button");
         if (!btns[buttonIndex]) return;
@@ -195,6 +235,11 @@
         }, 50);
     }
 
+    // -----------------------------
+    // 鍵盤快捷鍵
+    // -----------------------------
+    // 這裡集中處理各種批次操作快捷鍵，包括快速勾選、
+    // 清空、開連結、切換表頭選單與移動選取列。
     window.addEventListener("keydown", (e) => {
         if (isEditing(e)) return;
 
@@ -269,6 +314,11 @@
         }
     }, true);
 
+    // -----------------------------
+    // 自動重新初始化
+    // -----------------------------
+    // 因為頁面是 SPA 形式，表格可能在切換條件後整個被替換，
+    // 所以需要 observer 持續監看 DOM 變化並重新套用功能。
     function startInitObserver() {
         if (observerStarted) return;
         observerStarted = true;
@@ -302,6 +352,11 @@
         startObserving();
     }
 
+    // -----------------------------
+    // 啟動入口
+    // -----------------------------
+    // 頁面載入後先啟動 observer，再立即嘗試初始化一次，
+    // 確保不論表格先出現或後出現都能正常套用功能。
     startInitObserver();
     initEnhancements();
 })();
