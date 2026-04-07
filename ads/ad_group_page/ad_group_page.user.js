@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ad Group Page Additional Functions (Optimized V8)
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.02.1
+// @version      2026.04.07.1
 // @description  修正跳頂問題、優化選取邏輯、強化捲軸位置保持。
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.user.js
@@ -109,7 +109,7 @@
 
         if (!table[TABLE_FLAG]) {
             // 某些 Tabulator 欄位定義是動態生成的，初始化後再補強比較穩定。
-            patchFirstColumn(table);
+            setupColumns(table);
             resizeImageColumn(table);
             table[TABLE_FLAG] = true;
         }
@@ -122,16 +122,31 @@
     // 表格欄位補強
     // -----------------------------
     // Ad Group 頁面有些欄位定義是動態產生的，
-    // 這裡會補上 checkbox 欄位名稱與調整圖片欄寬度，讓排序與顯示更穩定。
-    function patchFirstColumn(activeTable) {
+    // 這裡會補上 checkbox 欄位名稱，並替啟用 target 數加上更直覺的表頭篩選。
+    function setupColumns(activeTable) {
         try {
-            const firstCol = activeTable.getColumns()[0];
-            // 第一欄原本是無 field 的 checkbox 欄，補上欄位名後才能拿來排序。
-            if (firstCol && !firstCol.getField()) {
-                firstCol.getDefinition().field = "checkBox";
+            const columns = activeTable.getColumnDefinitions();
+            if (columns.length > 0 && !columns[0].field) {
+                // 第一欄原本是無 field 的 checkbox 欄，補上欄位名後才能拿來排序。
+                columns[0].field = "checkBox";
             }
+
+            const enhancedCols = columns.map((col) => {
+                if (col.field === "num_enabled_targets") {
+                    return {
+                        ...col,
+                        headerFilter: "number",
+                        headerFilterFunc: "<=",
+                        headerFilterPlaceholder: "<="
+                    };
+                }
+
+                return col;
+            });
+
+            activeTable.setColumns(enhancedCols);
         } catch (e) {
-            console.warn("Failed to patch checkbox field", e);
+            console.warn("Failed to enhance Ad Group columns", e);
         }
     }
 
