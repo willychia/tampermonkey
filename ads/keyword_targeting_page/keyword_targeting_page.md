@@ -18,7 +18,7 @@ This script improves the interactivity and efficiency of working with the keywor
 - `Enter`: Toggle the hovered row
 - `Cmd/Ctrl + A`: Select matching rows and update the bid to `min(1, CPC)`
 - `Cmd/Ctrl + E`: Select or deselect active rows
-- `Cmd/Ctrl + F`: Select keywords with three or more words
+- `Cmd/Ctrl + F`: Select rows whose keyword is not exactly two characters after removing spaces
 - `Cmd/Ctrl + B`: Clear selection
 - `Cmd/Ctrl + S`: Export the table to Excel
 - `Cmd/Ctrl + ↑ / ↓`: Move the selection

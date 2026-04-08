@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Keyword Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.02.1
+// @version      2026.04.08.1
 // @description  Cmd+A 條件勾選並自動更新 Bid 為 Min(1, CPC)
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
@@ -288,7 +288,7 @@
     // 單列移動與長尾關鍵字勾選
     // -----------------------------
     // 這兩個功能分別負責用鍵盤移動目前選取列，
-    // 與快速找出字數較多、通常更值得人工檢查的長尾關鍵字。
+    // 與快速找出字數不等於 2 的關鍵字，方便集中檢查例外資料。
     function moveSelection(direction) {
         table = getTable();
         if (!table) return;
@@ -314,10 +314,11 @@
         table.deselectRow();
         table.getRows("active").forEach((row) => {
             const kw = row.getData().keyword || "";
-            const words = kw.trim().split(/\s+/);
+            const normalizedKeyword = kw.replace(/\s+/g, "");
+            const charCount = Array.from(normalizedKeyword).length;
 
-            // 這裡用詞數快速抓出較長尾、通常更值得集中檢查的關鍵字。
-            if (words.length >= 3) {
+            // 忽略空白後，只保留字數不是 2 的列。
+            if (normalizedKeyword && charCount !== 2) {
                 row.select();
             }
         });
