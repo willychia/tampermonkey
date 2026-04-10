@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Amazon Search - Smart Panel & Filter (v2.2.1)
+// @name         Amazon Search - Smart Panel & Filter (v2.2.2)
 // @namespace    https://willy-toolbox.example
-// @version      2.2.1
+// @version      2.2.2
 // @description  優化 UI：支援面板拖曳、設定記憶、動態載入重掃描、Cmd+B 隱藏面板，並顯示完整商品標題。
 // @author       Willy
 // @match        https://www.amazon.com/s?*
@@ -74,6 +74,15 @@
         .amz-asin-action-bar.selected .amz-asin-check-icon { display: block; }
 
         .amz-flash { position: fixed; bottom: 60px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); color: #fff; padding: 12px 28px; border-radius: 30px; z-index: 2147483647; display: none; font-weight: 600; }
+
+        #amz-panel-rescue {
+            position: fixed; top: 78px; right: 20px; z-index: 2147483647;
+            display: none; align-items: center; justify-content: center;
+            height: 34px; padding: 0 12px; border: 0; border-radius: 8px;
+            background: ${CONFIG.THEME_COLOR}; color: #fff; font: 800 12px system-ui, sans-serif;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.25); cursor: pointer;
+        }
+        #amz-panel-rescue:hover { filter: brightness(0.95); }
     `);
 
     function loadSettings() {
@@ -125,9 +134,63 @@
         panel.style.top = `${settings.panelTop}px`;
         panel.style.right = 'auto';
     }
+
+    const rescueBtn = document.createElement('button');
+    rescueBtn.id = 'amz-panel-rescue';
+    rescueBtn.type = 'button';
+    rescueBtn.title = '顯示 AMZ Filter 面板';
+    rescueBtn.textContent = 'AMZ';
+    document.body.appendChild(rescueBtn);
+
+    function getDefaultPanelPosition(width) {
+        return {
+            left: Math.max(8, window.innerWidth - width - 20),
+            top: 80
+        };
+    }
+
+    function getSafePanelPosition() {
+        const rect = panel.getBoundingClientRect();
+        const width = panel.offsetWidth || rect.width || 240;
+        const height = panel.offsetHeight || rect.height || 80;
+        const minVisible = Math.min(80, Math.max(40, width / 3));
+        const isLost =
+            rect.right < minVisible ||
+            rect.left > window.innerWidth - minVisible ||
+            rect.bottom < minVisible ||
+            rect.top > window.innerHeight - minVisible;
+        const base = isLost ? getDefaultPanelPosition(width) : { left: rect.left, top: rect.top };
+
+        return {
+            left: Math.min(Math.max(8, base.left), Math.max(8, window.innerWidth - width - 8)),
+            top: Math.min(Math.max(8, base.top), Math.max(8, window.innerHeight - height - 8))
+        };
+    }
+
+    function ensurePanelPosition() {
+        const position = getSafePanelPosition();
+        panel.style.left = `${position.left}px`;
+        panel.style.top = `${position.top}px`;
+        panel.style.right = 'auto';
+        saveSettings({ panelLeft: Math.round(position.left), panelTop: Math.round(position.top) });
+    }
+
+    function setPanelVisible(isVisible, shouldSave = true) {
+        state.isVisible = isVisible;
+        panel.style.display = isVisible ? 'flex' : 'none';
+        rescueBtn.style.display = isVisible ? 'none' : 'flex';
+        if (isVisible) requestAnimationFrame(ensurePanelPosition);
+        if (shouldSave) saveSettings({ isVisible: state.isVisible });
+    }
+
     panel.classList.toggle('minimized', state.isMinimized);
-    panel.style.display = state.isVisible ? 'flex' : 'none';
+    setPanelVisible(state.isVisible, false);
     document.getElementById('panel-minimize-btn').textContent = state.isMinimized ? "+" : "−";
+
+    rescueBtn.onclick = () => {
+        setPanelVisible(true);
+        flash('顯示面板');
+    };
 
     // 面板縮小切換
     document.getElementById('panel-minimize-btn').onclick = () => {
@@ -374,11 +437,13 @@
         // Cmd + B: 切換面板可見性
         if (key === 'b') {
             e.preventDefault();
-            state.isVisible = !state.isVisible;
-            panel.style.display = state.isVisible ? 'flex' : 'none';
-            saveSettings({ isVisible: state.isVisible });
-            flash(state.isVisible ? '顯示面板' : '面板已隱藏 (按 ⌘B 恢復)');
+            setPanelVisible(!state.isVisible);
+            flash(state.isVisible ? '顯示面板' : '面板已隱藏 (按 ⌘B 或 AMZ 恢復)');
         }
+    });
+
+    window.addEventListener('resize', () => {
+        if (state.isVisible) ensurePanelPosition();
     });
 
     let timer;
