@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Amazon Search - Smart Panel & Filter (v2.2.0)
+// @name         Amazon Search - Smart Panel & Filter (v2.2.1)
 // @namespace    https://willy-toolbox.example
-// @version      2.2.0
-// @description  優化 UI：支援面板拖曳、設定記憶、動態載入重掃描、Cmd+B 隱藏面板。
+// @version      2.2.1
+// @description  優化 UI：支援面板拖曳、設定記憶、動態載入重掃描、Cmd+B 隱藏面板，並顯示完整商品標題。
 // @author       Willy
 // @match        https://www.amazon.com/s?*
 // @match        https://www.amazon.co.uk/s?*
@@ -66,6 +66,7 @@
         .amz-asin-action-bar { background-color: ${CONFIG.BAR_BG}; color: #fff; display: flex; flex-direction: column; padding: 10px 14px; border-radius: 8px 8px 0 0; cursor: pointer; margin-bottom: 2px; }
         .amz-asin-action-bar.selected { background-color: ${CONFIG.THEME_COLOR} !important; }
         .bar-asin { font-family: monospace; font-weight: 800; font-size: 18px; }
+        .bar-title { font-size: 12px; line-height: 1.35; margin-bottom: 6px; overflow-wrap: anywhere; word-break: normal; }
         .bar-price { font-size: 16px; font-weight: 800; color: ${CONFIG.PRICE_COLOR}; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 4px; }
 
         .amz-asin-check-wrapper { width: 22px; height: 22px; background: #fff; border-radius: 5px; display: flex; align-items: center; justify-content: center; }
@@ -187,12 +188,49 @@
         };
     }
 
-    function getCleanTitle(item) {
-        const selectors = ['h2 a span', 'h2 span', 'h3 a span', '.a-text-normal'];
-        for (let s of selectors) {
-            const el = item.querySelector(s);
-            if (el && el.innerText.trim()) return el.innerText.trim().toLowerCase();
+    function normalizeProductText(value) {
+        return (value || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function getProductTitle(item) {
+        const selectors = [
+            'h2 a',
+            'h2 a span',
+            'h2 span',
+            'h3 a',
+            'h3 a span',
+            '.a-text-normal',
+            '.s-title-instructions-style',
+            'img.s-image'
+        ];
+        const candidates = [];
+
+        for (const selector of selectors) {
+            const el = item.querySelector(selector);
+            if (!el) continue;
+            ['aria-label', 'title', 'alt'].forEach(attr => {
+                const text = normalizeProductText(el.getAttribute(attr));
+                if (text) candidates.push(text);
+            });
+            const textContent = normalizeProductText(el.textContent);
+            if (textContent) candidates.push(textContent);
+            const innerText = normalizeProductText(el.innerText);
+            if (innerText) candidates.push(innerText);
         }
+
+        candidates.sort((a, b) => {
+            const aTruncated = /(?:\.{3}|…)\s*$/.test(a);
+            const bTruncated = /(?:\.{3}|…)\s*$/.test(b);
+            if (aTruncated !== bTruncated) return aTruncated ? 1 : -1;
+            return b.length - a.length;
+        });
+
+        return candidates[0] || "";
+    }
+
+    function getCleanTitle(item) {
+        const title = getProductTitle(item);
+        if (title) return title.toLowerCase();
         return "";
     }
 
@@ -205,7 +243,7 @@
         let count = 0;
         for (let info of state.allProducts) {
             if (count >= limit) break;
-            const title = getCleanTitle(info.item);
+            const title = (info.title || getCleanTitle(info.item)).toLowerCase();
             let match = true;
             if (info.price < minPrice) match = false;
             if (match && excl.length > 0 && excl.some(w => title.includes(w))) match = false;
@@ -263,6 +301,7 @@
             state.processedItems.add(item);
 
             const { priceText, priceNum } = getPriceInfo(item);
+            const title = getProductTitle(item);
 
             const bar = document.createElement('div');
             bar.className = 'amz-asin-action-bar';
@@ -271,14 +310,16 @@
                     <span class="bar-asin">${asin}</span>
                     <div class="amz-asin-check-wrapper"><span class="amz-asin-check-icon">✓</span></div>
                 </div>
+                <div class="bar-title"></div>
                 <div class="bar-price"></div>
             `;
+            bar.querySelector('.bar-title').textContent = title || '(未抓到商品標題)';
             bar.querySelector('.bar-price').textContent = priceText;
 
             bar.onclick = (e) => { e.stopPropagation(); toggleSelect(asin, bar, !state.selected.has(asin)); };
             target.parentNode.insertBefore(bar, target);
 
-            state.allProducts.push({ asin, bar, price: priceNum, item: item });
+            state.allProducts.push({ asin, bar, price: priceNum, item: item, title });
             syncAsinBars(asin);
 
             if (state.autoPickCounted < 10) { toggleSelect(asin, bar, true); state.autoPickCounted++; }
