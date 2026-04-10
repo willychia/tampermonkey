@@ -7,6 +7,8 @@
 // @match        https://www.amazon.com/s?*
 // @match        https://www.amazon.co.uk/s?*
 // @match        https://www.amazon.co.jp/s?*
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Search/Amazon%20Search.user.js
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Search/Amazon%20Search.user.js
 // @grant        GM_addStyle
 // @grant        GM_setClipboard
 // ==/UserScript==
