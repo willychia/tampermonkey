@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Keyword Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.08.2
-// @description  Cmd+A 條件勾選並自動更新 Bid 為 Min(1, CPC)
+// @version      2026.04.15.1
+// @description  Cmd+A 自動加價儲存，Cmd+D 依 ACOS 預填降價 Bid
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/keyword_targeting_page/keyword_targeting_page.user.js
@@ -172,6 +172,10 @@
                     e.preventDefault();
                     smartConditionSelectAndAdjustBid();
                     break;
+                case "d":
+                    e.preventDefault();
+                    smartConditionSelectAndPrepareBidReduction();
+                    break;
                 case "arrowup":
                     e.preventDefault();
                     moveSelection(-1);
@@ -242,6 +246,7 @@
                 daysOfSupply > 7 &&
                 acos <= 0.1 &&
                 unitsSold > 0 &&
+                bidVal < 1 &&
                 bidVal < cpcVal;
 
             // 只挑出庫存健康、表現不差且 bid 仍有上調空間的列。
@@ -282,6 +287,54 @@
         }
 
         console.log(`✅ 已完成 ${processedCount} 筆含銷量關鍵字的自動優化`);
+    }
+
+    // Cmd/Ctrl + D 會找出 ACOS 過高且 bid 高於目標值的列，
+    // 先把 bid 預填為計算後的 target bid，但保留給使用者手動檢查與儲存。
+    async function smartConditionSelectAndPrepareBidReduction() {
+        table = getTable();
+        if (!table) return;
+
+        table.deselectRow();
+        const activeRows = table.getRows("active");
+        const targetRows = [];
+
+        activeRows.forEach((row) => {
+            const data = row.getData();
+            const acos = parseFloat(data.acos) || 0;
+            const bidVal = parseFloat(parseFloat(data.bid || 0).toFixed(2));
+            const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
+            const targetBid = calculateHighAcosTargetBid({ acos, bidVal, cpcVal });
+
+            if (acos > 0.2 && Number.isFinite(targetBid) && bidVal > targetBid) {
+                row.select();
+                targetRows.push({ row, targetBid });
+            }
+        });
+
+        if (targetRows.length === 0) {
+            console.log("沒有符合 Cmd/Ctrl + D 降價條件的關鍵字");
+            return;
+        }
+
+        await sortByCheckBox();
+        scrollFirstSelectedToTop();
+
+        let preparedCount = 0;
+        for (const { row, targetBid } of targetRows) {
+            const rowEl = row.getElement();
+            const bidInput = rowEl?.querySelector('input[name="bid_fixed_value"]');
+
+            if (!bidInput) continue;
+
+            bidInput.value = targetBid.toFixed(2);
+            bidInput.dispatchEvent(new Event("input", { bubbles: true }));
+            bidInput.dispatchEvent(new Event("change", { bubbles: true }));
+            bidInput.style.backgroundColor = "#fff3cd";
+            preparedCount++;
+        }
+
+        console.log(`📝 已預填 ${preparedCount} 筆高 ACOS 關鍵字的新 Bid，尚未儲存`);
     }
 
     // -----------------------------
@@ -326,6 +379,16 @@
 
         await sortByCheckBox();
         utils.scrollFirstSelectedToTop(table);
+    }
+
+    function calculateHighAcosTargetBid({ acos, bidVal, cpcVal }) {
+        if (!(acos > 0.2) || !(bidVal > 0) || !(cpcVal > 0)) return NaN;
+
+        const bidIncreasement = Math.min(cpcVal / bidVal - 1, 3);
+        const rawTargetBid = cpcVal * 0.1 / acos / (1 + bidIncreasement);
+        const roundedTargetBid = Math.round(rawTargetBid * 100) / 100;
+
+        return Math.max(roundedTargetBid, 0.02);
     }
 
     // -----------------------------

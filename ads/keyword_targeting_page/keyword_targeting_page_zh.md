@@ -17,6 +17,7 @@
 
 - `Enter`：切換目前滑鼠停留列的選取狀態
 - `Cmd/Ctrl + A`：找出符合條件的列，將 Bid 自動更新為 `min(1, CPC)`，並逐筆送出儲存
+- `Cmd/Ctrl + D`：找出高 ACOS 且適合降價的列，將 Bid 預填成計算後的 `target bid`，但不會自動按儲存
 - `Cmd/Ctrl + E`：全選或取消全選目前畫面中的有效列
 - `Cmd/Ctrl + F`：勾選 `keyword` 詞數不等於 2 的列
 - `Cmd/Ctrl + B`：清空所有選取
@@ -33,9 +34,24 @@
 - `days_of_supply > 7`
 - `acos <= 0.1`
 - `units_sold_same_sku > 0`
+- `bid < 1`
 - `bid < cpc`
 
 更新時會把 Bid 設成 `min(1, CPC)`，並自動點擊儲存按鈕。
+
+## `Cmd/Ctrl + D` 高 ACOS 降價預填邏輯
+
+只有同時符合下列條件的列才會被自動勾選並預填 Bid：
+
+- `acos > 0.2`
+- `bid > target bid`
+
+計算方式如下：
+
+- `bid increasement = min(cpc / bid - 1, 3)`
+- `target bid = max(round(cpc * 0.1 / acos / (1 + bid increasement), 2), 0.02)`
+
+符合條件時，Bid input 會直接被改成 `target bid`，並保留未儲存狀態，方便你先檢查再手動按 Save。
 
 ## `Cmd/Ctrl + F` 關鍵字例外選取邏輯
 

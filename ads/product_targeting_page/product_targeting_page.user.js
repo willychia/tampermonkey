@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Product Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.02.1
-// @description  Product Targeting 加強版：Cmd+A 自動調價、ASIN 批次勾選、UI 優化
+// @version      2026.04.15.1
+// @description  Product Targeting 加強版：Cmd+A 自動調價、Cmd+D 預填降價、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.user.js
@@ -190,6 +190,10 @@
                     e.preventDefault();
                     smartConditionSelectAndSave();
                     break;
+                case "d":
+                    e.preventDefault();
+                    smartConditionSelectAndPrepareBidReduction();
+                    break;
                 case "arrowup":
                     e.preventDefault();
                     moveSelection(-1);
@@ -250,7 +254,7 @@
             const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
 
             // 用相同商業條件挑出值得加價的 target，再統一執行儲存。
-            if (daysOfSupply > 7 && acos <= 0.1 && unitsSold > 0 && bidVal < cpcVal) {
+            if (daysOfSupply > 7 && acos <= 0.1 && unitsSold > 0 && bidVal < 1 && bidVal < cpcVal) {
                 row.select();
                 targetRows.push(row);
             }
@@ -287,6 +291,54 @@
         }
 
         console.log(`已儲存 ${count} 筆自動優化資料`);
+    }
+
+    // Cmd/Ctrl + D 會找出 ACOS 偏高且 bid 可下修的 target，
+    // 預先填入計算後的新 bid，保留給使用者逐筆確認後再決定是否儲存。
+    async function smartConditionSelectAndPrepareBidReduction() {
+        table = getTable();
+        if (!table) return;
+
+        table.deselectRow();
+        const activeRows = table.getRows("active");
+        const targetRows = [];
+
+        activeRows.forEach((row) => {
+            const data = row.getData();
+            const acos = parseFloat(data.acos) || 0;
+            const bidVal = parseFloat(parseFloat(data.bid || 0).toFixed(2));
+            const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
+            const targetBid = calculateHighAcosTargetBid({ acos, bidVal, cpcVal });
+
+            if (acos > 0.2 && Number.isFinite(targetBid) && bidVal > targetBid) {
+                row.select();
+                targetRows.push({ row, targetBid });
+            }
+        });
+
+        if (targetRows.length === 0) {
+            console.log("沒有符合 Cmd/Ctrl + D 降價條件的 Target");
+            return;
+        }
+
+        await sortByCheckBox();
+        scrollFirstSelectedToTop();
+
+        let preparedCount = 0;
+        for (const { row, targetBid } of targetRows) {
+            const rowEl = row.getElement();
+            const bidInput = rowEl?.querySelector('input[name="bid_fixed_value"]');
+
+            if (!bidInput) continue;
+
+            bidInput.value = targetBid.toFixed(2);
+            bidInput.dispatchEvent(new Event("input", { bubbles: true }));
+            bidInput.dispatchEvent(new Event("change", { bubbles: true }));
+            bidInput.style.backgroundColor = "#fff3cd";
+            preparedCount++;
+        }
+
+        console.log(`已預填 ${preparedCount} 筆高 ACOS Target 的新 Bid，尚未儲存`);
     }
 
     // -----------------------------
@@ -332,6 +384,16 @@
         await sortByCheckBox();
         utils.scrollFirstSelectedToTop(table);
         console.log(`共勾選 ${count} 筆符合 ASIN 的資料`);
+    }
+
+    function calculateHighAcosTargetBid({ acos, bidVal, cpcVal }) {
+        if (!(acos > 0.2) || !(bidVal > 0) || !(cpcVal > 0)) return NaN;
+
+        const bidIncreasement = Math.min(cpcVal / bidVal - 1, 3);
+        const rawTargetBid = cpcVal * 0.1 / acos / (1 + bidIncreasement);
+        const roundedTargetBid = Math.round(rawTargetBid * 100) / 100;
+
+        return Math.max(roundedTargetBid, 0.02);
     }
 
     // -----------------------------
