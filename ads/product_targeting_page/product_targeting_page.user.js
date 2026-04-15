@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Product Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.15.1
+// @version      2026.04.15.2
 // @description  Product Targeting 加強版：Cmd+A 自動調價、Cmd+D 預填降價、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
@@ -262,6 +262,7 @@
 
         if (targetRows.length === 0) {
             console.log("沒有符合條件的 Target");
+            utils.showAlert("No product target rows matched the Cmd/Ctrl + A conditions.");
             return;
         }
 
@@ -318,6 +319,7 @@
 
         if (targetRows.length === 0) {
             console.log("沒有符合 Cmd/Ctrl + D 降價條件的 Target");
+            utils.showAlert("No product target rows matched the Cmd/Ctrl + D conditions.");
             return;
         }
 
@@ -389,8 +391,7 @@
     function calculateHighAcosTargetBid({ acos, bidVal, cpcVal }) {
         if (!(acos > 0.2) || !(bidVal > 0) || !(cpcVal > 0)) return NaN;
 
-        const bidIncreasement = Math.min(cpcVal / bidVal - 1, 3);
-        const rawTargetBid = cpcVal * 0.1 / acos / (1 + bidIncreasement);
+        const rawTargetBid = cpcVal * 0.1 / acos;
         const roundedTargetBid = Math.round(rawTargetBid * 100) / 100;
 
         return Math.max(roundedTargetBid, 0.02);

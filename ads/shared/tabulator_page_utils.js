@@ -33,6 +33,10 @@
         return tabulator.findTable(selector)[0] || null;
     }
 
+    function showAlert(message) {
+        pageWindow.alert(message);
+    }
+
     // -----------------------------
     // DOM 與狀態比對
     // -----------------------------
@@ -186,6 +190,7 @@
         getTableBySelector,
         isEditingEvent,
         scrollFirstSelectedToTop,
+        showAlert,
         sortByField,
         startInitObserver,
         wait
