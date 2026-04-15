@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Product Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.15.2
+// @version      2026.04.15.3
 // @description  Product Targeting 加強版：Cmd+A 自動調價、Cmd+D 預填降價、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
@@ -394,7 +394,7 @@
         const rawTargetBid = cpcVal * 0.1 / acos;
         const roundedTargetBid = Math.round(rawTargetBid * 100) / 100;
 
-        return Math.max(roundedTargetBid, 0.02);
+        return Math.max(roundedTargetBid, 0.05);
     }
 
     // -----------------------------

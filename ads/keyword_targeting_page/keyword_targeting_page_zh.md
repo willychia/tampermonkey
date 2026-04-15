@@ -48,7 +48,7 @@
 
 計算方式如下：
 
-- `target bid = max(round(cpc * 0.1 / acos, 2), 0.02)`
+- `target bid = max(round(cpc * 0.1 / acos, 2), 0.05)`
 
 符合條件時，Bid input 會直接被改成 `target bid`，並保留未儲存狀態，方便你先檢查再手動按 Save。
 

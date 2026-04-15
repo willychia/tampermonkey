@@ -33,8 +33,46 @@
         return tabulator.findTable(selector)[0] || null;
     }
 
+    const TOAST_CONTAINER_ID = "tm-page-toast-container";
+    let toastHideTimer = null;
+
+    function ensureToastContainer() {
+        let container = document.getElementById(TOAST_CONTAINER_ID);
+        if (container) return container;
+
+        container = document.createElement("div");
+        container.id = TOAST_CONTAINER_ID;
+        container.style.position = "fixed";
+        container.style.top = "16px";
+        container.style.left = "50%";
+        container.style.transform = "translateX(-50%)";
+        container.style.zIndex = "10000";
+        container.style.pointerEvents = "none";
+        document.body.appendChild(container);
+        return container;
+    }
+
     function showAlert(message) {
-        pageWindow.alert(message);
+        const container = ensureToastContainer();
+
+        container.textContent = message;
+        container.style.padding = "10px 16px";
+        container.style.background = "rgba(32, 33, 36, 0.92)";
+        container.style.color = "#fff";
+        container.style.borderRadius = "8px";
+        container.style.boxShadow = "0 8px 24px rgba(0, 0, 0, 0.24)";
+        container.style.fontSize = "14px";
+        container.style.fontWeight = "600";
+        container.style.opacity = "1";
+        container.style.transition = "opacity 0.2s ease";
+
+        if (toastHideTimer) {
+            clearTimeout(toastHideTimer);
+        }
+
+        toastHideTimer = setTimeout(() => {
+            container.style.opacity = "0";
+        }, 2600);
     }
 
     // -----------------------------
