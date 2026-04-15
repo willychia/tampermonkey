@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Keyword Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.16.1
+// @version      2026.04.16.2
 // @description  Cmd+A 自動加價儲存，Cmd+D 依 ACOS 預填降價 Bid
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
@@ -291,7 +291,7 @@
     }
 
     // Cmd/Ctrl + D 會找出 ACOS 過高且 bid 高於目標值的列，
-    // 先把 bid 預填為計算後的 target bid，但保留給使用者手動檢查與儲存。
+    // 直接把 bid 更新為計算後的 target bid，並逐筆送出儲存。
     async function smartConditionSelectAndPrepareBidReduction() {
         table = getTable();
         if (!table) return;
@@ -322,21 +322,24 @@
         await sortByCheckBox();
         scrollFirstSelectedToTop();
 
-        let preparedCount = 0;
+        let savedCount = 0;
         for (const { row, targetBid } of targetRows) {
             const rowEl = row.getElement();
             const bidInput = rowEl?.querySelector('input[name="bid_fixed_value"]');
+            const saveBtn = rowEl?.querySelector('button.save-bid-button[type="submit"]');
 
-            if (!bidInput) continue;
+            if (!bidInput || !saveBtn) continue;
 
             bidInput.value = targetBid.toFixed(2);
             bidInput.dispatchEvent(new Event("input", { bubbles: true }));
             bidInput.dispatchEvent(new Event("change", { bubbles: true }));
             bidInput.style.backgroundColor = "#fff3cd";
-            preparedCount++;
+            saveBtn.click();
+            savedCount++;
+            await utils.wait(200);
         }
 
-        console.log(`📝 已預填 ${preparedCount} 筆高 ACOS 關鍵字的新 Bid，尚未儲存`);
+        console.log(`✅ 已完成 ${savedCount} 筆高 ACOS 關鍵字的自動降價`);
     }
 
     // -----------------------------
