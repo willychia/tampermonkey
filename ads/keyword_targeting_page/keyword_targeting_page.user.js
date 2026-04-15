@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Keyword Targeting Page Enhanced Pro
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.15.3
+// @version      2026.04.16.1
 // @description  Cmd+A 自動加價儲存，Cmd+D 依 ACOS 預填降價 Bid
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
@@ -386,7 +386,7 @@
     function calculateHighAcosTargetBid({ acos, bidVal, cpcVal }) {
         if (!(acos > 0.2) || !(bidVal > 0) || !(cpcVal > 0)) return NaN;
 
-        const rawTargetBid = cpcVal * 0.1 / acos;
+        const rawTargetBid = cpcVal * 0.2 / acos;
         const roundedTargetBid = Math.round(rawTargetBid * 100) / 100;
 
         return Math.max(roundedTargetBid, 0.05);
