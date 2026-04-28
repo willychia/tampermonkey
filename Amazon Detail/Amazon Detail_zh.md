@@ -15,12 +15,12 @@
 - 可使用 OpenAI API 產生 3 組 Search Term Strategy 與 Amazon Search 連結。
 - 若未設定 OpenAI API key，或 API 呼叫失敗，會自動退回規則版 Core Keywords。
 - 支援在面板中手動編輯 Core Keywords，搜尋連結會即時更新。
-- 可複製 Markdown 格式的 Product Targeting 候選清單。
+- 可複製已勾選的 ASIN 清單。
 
 ## 快捷鍵
 
 - `Cmd/Ctrl + G`：重新掃描目前 Detail Page 並更新面板。
-- `Cmd/Ctrl + D`：複製 Markdown 格式的候選 ASIN 清單。
+- `Cmd/Ctrl + D`：複製已勾選的 ASIN，一行一個。
 - `Cmd/Ctrl + B`：顯示或隱藏面板。
 
 若游標正在輸入框、文字區塊、下拉選單或可編輯文字區域中，快捷鍵不會觸發。
@@ -101,12 +101,10 @@ OpenAI 不需要回傳篩選欄位；`minReviews`、`minRating`、`maxRating`、
 
 ## 複製內容
 
-`Cmd/Ctrl + D` 會複製 Markdown，包含：
+`Cmd/Ctrl + D` 會複製已勾選的 ASIN，一行一個：
 
-- 主商品 ASIN、標題、URL
-- Search Term Strategy 與 Search links
-- 已勾選的 Complementary Products ASIN 與圖片 URL，最多 10 個
-- 已勾選的 Direct Competitors ASIN 與圖片 URL，最多 10 個
+- Complementary Products 中已勾選的 ASIN
+- Direct Competitors 中已勾選的 ASIN
 
 若某一區沒有抓到候選，會顯示 `No candidates found on current page`。
 

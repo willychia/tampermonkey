@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.16
+// @version      2026.04.28.17
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -1216,10 +1216,19 @@
         ].join("\n");
     }
 
-    async function copyMarkdown() {
+    function getSelectedAsinsForCopy() {
+        const ordered = [
+            ...getSelectedCandidates(CATEGORY.COMPLEMENTARY),
+            ...getSelectedCandidates(CATEGORY.DIRECT)
+        ];
+        return [...new Set(ordered.map((item) => item.asin))];
+    }
+
+    async function copySelectedAsins() {
         if (!state.product) await scanPage();
-        GM_setClipboard(buildMarkdown());
-        flash("已複製 Product Targeting Markdown");
+        const asins = getSelectedAsinsForCopy();
+        GM_setClipboard(asins.join("\n"));
+        flash(`已複製 ${asins.length} 個已勾選 ASIN`);
     }
 
     panel.querySelector("#amz-detail-pt-hide").addEventListener("click", () => {
@@ -1241,7 +1250,7 @@
         }
         if (key === "d") {
             e.preventDefault();
-            copyMarkdown();
+            copySelectedAsins();
         }
         if (key === "b") {
             e.preventDefault();
