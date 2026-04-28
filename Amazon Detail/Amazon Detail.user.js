@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.1
-// @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、Core Keywords 與搜尋連結。
+// @version      2026.04.28.2
+// @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
 // @match        https://www.amazon.com/*/dp/*
@@ -11,6 +11,10 @@
 // @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Detail/Amazon%20Detail.user.js
 // @grant        GM_addStyle
 // @grant        GM_setClipboard
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
+// @connect      api.openai.com
 // ==/UserScript==
 
 (function () {
@@ -19,6 +23,7 @@
     const CONFIG = {
         MAX_PER_SECTION: 10,
         MAX_KEYWORDS: 5,
+        DEFAULT_MODEL: "gpt-4.1-mini",
         PANEL_ID: "amz-detail-pt-panel",
         RESCUE_ID: "amz-detail-pt-rescue",
         STORAGE_KEY: "amz-detail-product-targeting-v1",
@@ -112,6 +117,12 @@
             [CATEGORY.REVIEW]: []
         },
         keywords: [],
+        keywordMode: "rule",
+        selected: {
+            [CATEGORY.DIRECT]: new Set(),
+            [CATEGORY.COMPLEMENTARY]: new Set(),
+            [CATEGORY.REVIEW]: new Set()
+        },
         isVisible: true,
         flashTimer: null
     };
@@ -130,6 +141,18 @@
         }
         #${CONFIG.PANEL_ID} .panel-title { font-weight: 800; color: ${CONFIG.THEME_COLOR}; }
         #${CONFIG.PANEL_ID} .panel-body { overflow: auto; padding: 12px 14px 14px; }
+        #${CONFIG.PANEL_ID} .settings-row {
+            display: grid; grid-template-columns: 1fr 92px; gap: 6px; margin: 8px 0 10px;
+        }
+        #${CONFIG.PANEL_ID} .settings-row input {
+            min-width: 0; border: 1px solid #ddd; border-radius: 5px; padding: 5px 6px; font-size: 12px;
+        }
+        #${CONFIG.PANEL_ID} .settings-actions { display: flex; gap: 6px; margin-bottom: 10px; }
+        #${CONFIG.PANEL_ID} .mini-btn {
+            border: 1px solid #ddd; background: #fff; border-radius: 5px; padding: 5px 7px;
+            cursor: pointer; font-weight: 700; font-size: 11px; color: #333;
+        }
+        #${CONFIG.PANEL_ID} .mini-btn:hover { border-color: ${CONFIG.THEME_COLOR}; color: ${CONFIG.THEME_COLOR}; }
         #${CONFIG.PANEL_ID} .btn-toggle {
             border: 0; background: transparent; color: #666; cursor: pointer; font-size: 16px; font-weight: 800;
             padding: 0 4px;
@@ -154,7 +177,12 @@
         #${CONFIG.PANEL_ID} .meta { color: #666; font-size: 11px; line-height: 1.35; margin-top: 4px; }
         #${CONFIG.PANEL_ID} .asin-link,
         #${CONFIG.PANEL_ID} .search-link { color: #0066c0; text-decoration: none; font-weight: 700; }
-        #${CONFIG.PANEL_ID} .asin-title { margin-top: 4px; color: #333; line-height: 1.3; overflow-wrap: anywhere; }
+        #${CONFIG.PANEL_ID} .asin-main { display: grid; grid-template-columns: 44px 1fr; gap: 8px; margin-top: 6px; }
+        #${CONFIG.PANEL_ID} .asin-img {
+            width: 44px; height: 44px; border-radius: 6px; object-fit: contain; background: #f7f7f7; border: 1px solid #eee;
+        }
+        #${CONFIG.PANEL_ID} .asin-check { width: 16px; height: 16px; flex: 0 0 auto; accent-color: ${CONFIG.THEME_COLOR}; }
+        #${CONFIG.PANEL_ID} .asin-title { color: #333; line-height: 1.3; overflow-wrap: anywhere; }
         #${CONFIG.PANEL_ID} .empty { color: #777; font-size: 12px; padding: 8px; border: 1px dashed #ccc; border-radius: 8px; }
         #${CONFIG.PANEL_ID} .hint {
             margin-top: 12px; padding-top: 9px; border-top: 1px solid #eee; color: #666; line-height: 1.45; font-size: 11px;
@@ -186,6 +214,38 @@
             localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify({ ...loadSettings(), ...patch }));
         } catch (_) {
             // 記憶面板位置失敗不影響主要功能。
+        }
+    }
+
+    function getApiKey() {
+        try {
+            return GM_getValue("openai_api_key", "");
+        } catch (_) {
+            return "";
+        }
+    }
+
+    function setApiKey(value) {
+        try {
+            GM_setValue("openai_api_key", value || "");
+        } catch (_) {
+            // API key 儲存失敗時，保留本次頁面操作即可。
+        }
+    }
+
+    function getOpenAiModel() {
+        try {
+            return GM_getValue("openai_model", CONFIG.DEFAULT_MODEL) || CONFIG.DEFAULT_MODEL;
+        } catch (_) {
+            return CONFIG.DEFAULT_MODEL;
+        }
+    }
+
+    function setOpenAiModel(value) {
+        try {
+            GM_setValue("openai_model", normalizeText(value) || CONFIG.DEFAULT_MODEL);
+        } catch (_) {
+            // Model 儲存失敗不影響掃描。
         }
     }
 
@@ -358,6 +418,13 @@
         return match ? `${match[1]}★` : "";
     }
 
+    function getImageFromNode(node) {
+        const img = node.querySelector("img");
+        if (!img) return "";
+        const src = img.currentSrc || img.src || img.getAttribute("data-src") || "";
+        return src && !/transparent-pixel|grey-pixel|sprite/i.test(src) ? src : "";
+    }
+
     function getBrand() {
         const byline = normalizeText(document.querySelector("#bylineInfo")?.textContent)
             .replace(/^Visit the /i, "")
@@ -414,6 +481,10 @@
             asin: getCurrentAsin(),
             title: normalizeText(document.querySelector("#productTitle")?.textContent),
             brand: getBrand(),
+            image: document.querySelector("#landingImage")?.currentSrc
+                || document.querySelector("#landingImage")?.src
+                || document.querySelector("#imgTagWrapperId img")?.src
+                || "",
             breadcrumbs: getBreadcrumbs(),
             bullets: getBullets(),
             bsrTexts: getBsrTexts(),
@@ -480,6 +551,7 @@
                 category: resolvedCategory,
                 source: moduleName,
                 title: getTitleFromNode(itemRoot),
+                image: getImageFromNode(itemRoot),
                 price: getPriceFromNode(itemRoot),
                 rating: getRatingFromNode(itemRoot)
             });
@@ -504,6 +576,7 @@
         }
         score += Math.min(candidate.sources.length - 1, 4) * 12;
         if (candidate.title) score += 8;
+        if (candidate.image) score += 4;
         if (candidate.price) score += 5;
         if (candidate.rating) score += 4;
         return score;
@@ -519,12 +592,14 @@
                     category: item.category,
                     sources: [],
                     title: "",
+                    image: "",
                     price: "",
                     rating: ""
                 };
 
                 if (!current.sources.includes(item.source)) current.sources.push(item.source);
                 if (!current.title && item.title) current.title = item.title;
+                if (!current.image && item.image) current.image = item.image;
                 if (!current.price && item.price) current.price = item.price;
                 if (!current.rating && item.rating) current.rating = item.rating;
                 if (current.category === CATEGORY.REVIEW && item.category !== CATEGORY.REVIEW) current.category = item.category;
@@ -631,12 +706,126 @@
             .slice(0, CONFIG.MAX_KEYWORDS);
     }
 
+    function gmRequestJson(options) {
+        return new Promise((resolve, reject) => {
+            GM_xmlhttpRequest({
+                method: options.method || "POST",
+                url: options.url,
+                headers: options.headers || {},
+                data: options.data ? JSON.stringify(options.data) : undefined,
+                timeout: options.timeout || 30000,
+                onload: (response) => {
+                    let body = null;
+                    try {
+                        body = JSON.parse(response.responseText || "{}");
+                    } catch (err) {
+                        reject(new Error(`OpenAI returned non-JSON response: ${err.message}`));
+                        return;
+                    }
+                    if (response.status < 200 || response.status >= 300) {
+                        reject(new Error(body?.error?.message || `OpenAI request failed with ${response.status}`));
+                        return;
+                    }
+                    resolve(body);
+                },
+                onerror: () => reject(new Error("OpenAI request failed")),
+                ontimeout: () => reject(new Error("OpenAI request timed out"))
+            });
+        });
+    }
+
+    function extractResponseText(response) {
+        if (typeof response.output_text === "string") return response.output_text;
+        const chunks = [];
+        (response.output || []).forEach((item) => {
+            (item.content || []).forEach((content) => {
+                if (content.text) chunks.push(content.text);
+            });
+        });
+        return chunks.join("\n");
+    }
+
+    function parseKeywordJson(text) {
+        const cleaned = normalizeText(text)
+            .replace(/^```(?:json)?/i, "")
+            .replace(/```$/i, "")
+            .trim();
+        const match = cleaned.match(/\{[\s\S]*\}/);
+        const json = JSON.parse(match ? match[0] : cleaned);
+        const keywords = Array.isArray(json.keywords) ? json.keywords : [];
+        return keywords
+            .map((item, index) => ({
+                keyword: normalizeText(item.keyword || item),
+                score: Number.isFinite(Number(item.score)) ? Number(item.score) : Math.max(100 - index * 8, 60),
+                sources: [normalizeText(item.reason || item.type || "OpenAI").replace(/\s+/g, " ") || "OpenAI"]
+            }))
+            .filter((item) => item.keyword)
+            .slice(0, CONFIG.MAX_KEYWORDS);
+    }
+
+    function buildOpenAiPrompt(product) {
+        return [
+            "You generate Amazon Product Targeting research keywords.",
+            "Return strict JSON only with this shape:",
+            "{\"keywords\":[{\"keyword\":\"2-4 word keyword\",\"score\":95,\"reason\":\"short reason\"}]}",
+            "Rules:",
+            "- Generate 3 to 5 core keywords for finding competitor ASINs on Amazon Search.",
+            "- Prefer product noun phrases, not brand names.",
+            "- Avoid color, pack count, size, marketing words, and overly specific variants unless essential.",
+            "- Include category/use-case terms only when they help find relevant competing products.",
+            "- Keywords should be concise English phrases.",
+            "",
+            `ASIN: ${product.asin || ""}`,
+            `Title: ${product.title || ""}`,
+            `Brand: ${product.brand || ""}`,
+            `Breadcrumbs: ${(product.breadcrumbs || []).join(" > ")}`,
+            `BSR/Category Text: ${(product.bsrTexts || []).join(" | ")}`,
+            `Bullets: ${(product.bullets || []).slice(0, 5).join(" | ")}`,
+            `Variation Text: ${product.variationText || ""}`
+        ].join("\n");
+    }
+
+    async function generateOpenAiKeywords(product) {
+        const apiKey = getApiKey();
+        if (!apiKey) return null;
+
+        const response = await gmRequestJson({
+            url: "https://api.openai.com/v1/responses",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`
+            },
+            data: {
+                model: getOpenAiModel(),
+                input: buildOpenAiPrompt(product),
+                max_output_tokens: 700
+            }
+        });
+
+        const keywords = parseKeywordJson(extractResponseText(response));
+        return keywords.length ? keywords : null;
+    }
+
     function searchUrl(keyword) {
         return `https://www.amazon.com/s?k=${encodeURIComponent(keyword)}`;
     }
 
     function asinUrl(asin) {
         return `https://www.amazon.com/dp/${asin}`;
+    }
+
+    function setDefaultSelection() {
+        Object.values(CATEGORY).forEach((category) => {
+            state.selected[category] = new Set((state.candidates[category] || []).map((item) => item.asin));
+        });
+    }
+
+    function isCandidateSelected(category, asin) {
+        return state.selected[category]?.has(asin);
+    }
+
+    function getSelectedCandidates(category) {
+        return (state.candidates[category] || []).filter((item) => isCandidateSelected(category, item.asin));
     }
 
     function escapeHtml(value) {
@@ -660,17 +849,42 @@
         `).join("");
     }
 
-    function renderCandidate(candidate) {
-        const title = candidate.title ? `<div class="asin-title">${escapeHtml(candidate.title)}</div>` : "";
+    function renderSettings() {
+        const model = getOpenAiModel();
+        const hasKey = Boolean(getApiKey());
+        return `
+            <div class="settings-row">
+                <input id="amz-detail-openai-key" type="password" placeholder="${hasKey ? "OpenAI key saved" : "OpenAI API key"}">
+                <input id="amz-detail-openai-model" type="text" value="${escapeHtml(model)}" title="OpenAI model">
+            </div>
+            <div class="settings-actions">
+                <button class="mini-btn" id="amz-detail-save-openai" type="button">Save OpenAI</button>
+                <button class="mini-btn" id="amz-detail-clear-openai" type="button">Clear Key</button>
+                <span class="score">Keywords: ${escapeHtml(state.keywordMode)}</span>
+            </div>
+        `;
+    }
+
+    function renderCandidate(candidate, category) {
+        const title = candidate.title ? `<div class="asin-title">${escapeHtml(candidate.title)}</div>` : `<div class="asin-title">Title not found</div>`;
         const meta = [candidate.price, candidate.rating].filter(Boolean).join(" · ");
+        const checked = isCandidateSelected(category, candidate.asin) ? "checked" : "";
         return `
             <div class="asin-row">
                 <div class="asin-top">
-                    <a class="asin-link" href="${asinUrl(candidate.asin)}" target="_blank">${candidate.asin}</a>
+                    <label style="display:flex;align-items:center;gap:6px;min-width:0;">
+                        <input class="asin-check" type="checkbox" data-candidate-category="${category}" data-candidate-asin="${candidate.asin}" ${checked}>
+                        <a class="asin-link" href="${asinUrl(candidate.asin)}" target="_blank">${candidate.asin}</a>
+                    </label>
                     <span class="score">score ${candidate.score}</span>
                 </div>
-                ${title}
-                ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
+                <div class="asin-main">
+                    ${candidate.image ? `<img class="asin-img" src="${escapeHtml(candidate.image)}" alt="">` : `<div class="asin-img"></div>`}
+                    <div>
+                        ${title}
+                        ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
+                    </div>
+                </div>
                 <div class="source">${escapeHtml(candidate.sources.slice(0, 2).join(" / "))}</div>
             </div>
         `;
@@ -678,9 +892,10 @@
 
     function renderCandidateSection(category) {
         const items = state.candidates[category] || [];
+        const selectedCount = getSelectedCandidates(category).length;
         return `
-            <h3>${CATEGORY_LABEL[category]} <span class="section-count">${items.length}/${CONFIG.MAX_PER_SECTION}</span></h3>
-            ${items.length ? items.map(renderCandidate).join("") : `<div class="empty">No candidates found on current page</div>`}
+            <h3>${CATEGORY_LABEL[category]} <span class="section-count" data-section-count="${category}">${selectedCount}/${items.length} selected</span></h3>
+            ${items.length ? items.map((item) => renderCandidate(item, category)).join("") : `<div class="empty">No candidates found on current page</div>`}
         `;
     }
 
@@ -692,6 +907,7 @@
                 <div><span class="pt-asin">${escapeHtml(product.asin || "ASIN not found")}</span></div>
                 <div>${escapeHtml(product.title || "Title not found")}</div>
             </div>
+            ${renderSettings()}
             <h3>Core Keywords <span class="section-count">${state.keywords.length}/${CONFIG.MAX_KEYWORDS}</span></h3>
             ${renderKeywords()}
             ${renderCandidateSection(CATEGORY.DIRECT)}
@@ -718,19 +934,70 @@
                 if (link) link.href = searchUrl(nextValue);
             });
         });
+
+        body.querySelector("#amz-detail-save-openai")?.addEventListener("click", () => {
+            const keyInput = body.querySelector("#amz-detail-openai-key");
+            const modelInput = body.querySelector("#amz-detail-openai-model");
+            const nextKey = normalizeText(keyInput?.value || "");
+            if (nextKey) setApiKey(nextKey);
+            setOpenAiModel(modelInput?.value || CONFIG.DEFAULT_MODEL);
+            flash(nextKey ? "OpenAI 設定已儲存" : "Model 已儲存，API key 保持不變");
+            renderPanel();
+        });
+
+        body.querySelector("#amz-detail-clear-openai")?.addEventListener("click", () => {
+            setApiKey("");
+            flash("OpenAI API key 已清除，會改用規則版 keywords");
+            renderPanel();
+        });
+
+        body.querySelectorAll("[data-candidate-asin]").forEach((input) => {
+            input.addEventListener("change", () => {
+                const category = input.getAttribute("data-candidate-category");
+                const asin = input.getAttribute("data-candidate-asin");
+                if (!state.selected[category]) return;
+                if (input.checked) state.selected[category].add(asin);
+                else state.selected[category].delete(asin);
+                const counter = body.querySelector(`[data-section-count="${category}"]`);
+                if (counter) counter.textContent = `${getSelectedCandidates(category).length}/${(state.candidates[category] || []).length} selected`;
+            });
+        });
     }
 
-    function scanPage() {
+    async function scanPage() {
         state.product = getProductInfo();
-        state.keywords = generateKeywords(state.product);
         state.candidates = collectCandidates(state.product.asin);
+        setDefaultSelection();
+        state.keywords = generateKeywords(state.product);
+        state.keywordMode = "rule fallback";
+        renderPanel();
+        setPanelVisible(true);
+
+        if (getApiKey()) {
+            flash("正在用 OpenAI 產生 Core Keywords...");
+            try {
+                const aiKeywords = await generateOpenAiKeywords(state.product);
+                if (aiKeywords) {
+                    state.keywords = aiKeywords;
+                    state.keywordMode = "OpenAI";
+                    renderPanel();
+                }
+            } catch (err) {
+                console.warn("OpenAI keyword generation failed", err);
+                state.keywordMode = "rule fallback";
+                renderPanel();
+                flash(`OpenAI 失敗，已改用規則版：${err.message}`);
+                return;
+            }
+        }
+
         renderPanel();
         setPanelVisible(true);
 
         const direct = state.candidates[CATEGORY.DIRECT].length;
         const comp = state.candidates[CATEGORY.COMPLEMENTARY].length;
         const review = state.candidates[CATEGORY.REVIEW].length;
-        flash(`已更新：競品 ${direct}、互補 ${comp}、待確認 ${review}`);
+        flash(`已更新：競品 ${direct}、互補 ${comp}、待確認 ${review}，Keywords: ${state.keywordMode}`);
     }
 
     function formatCandidateList(items) {
@@ -738,7 +1005,8 @@
         return items.map((item) => {
             const title = item.title ? ` - ${item.title}` : "";
             const source = item.sources.length ? ` (${item.sources.slice(0, 2).join(" / ")})` : "";
-            return `- ${item.asin}${title}${source}`;
+            const image = item.image ? `\n  Image: ${item.image}` : "";
+            return `- ${item.asin}${title}${source}${image}`;
         }).join("\n");
     }
 
@@ -758,13 +1026,13 @@
             keywordLines,
             "",
             "## Direct Competitors",
-            formatCandidateList(state.candidates[CATEGORY.DIRECT]),
+            formatCandidateList(getSelectedCandidates(CATEGORY.DIRECT)),
             "",
             "## Complementary Products",
-            formatCandidateList(state.candidates[CATEGORY.COMPLEMENTARY]),
+            formatCandidateList(getSelectedCandidates(CATEGORY.COMPLEMENTARY)),
             "",
             "## Need Review",
-            formatCandidateList(state.candidates[CATEGORY.REVIEW]),
+            formatCandidateList(getSelectedCandidates(CATEGORY.REVIEW)),
             "",
             "## High Traffic Research Links",
             state.keywords.length
@@ -773,8 +1041,8 @@
         ].join("\n");
     }
 
-    function copyMarkdown() {
-        if (!state.product) scanPage();
+    async function copyMarkdown() {
+        if (!state.product) await scanPage();
         GM_setClipboard(buildMarkdown());
         flash("已複製 Product Targeting Markdown");
     }
