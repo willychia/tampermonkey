@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.6
+// @version      2026.04.28.7
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -178,6 +178,7 @@
         #${CONFIG.PANEL_ID} .asin-main { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
         #${CONFIG.PANEL_ID} .asin-img {
             width: 100%; height: 220px; border-radius: 6px; object-fit: contain; background: #f7f7f7; border: 1px solid #eee;
+            cursor: pointer;
         }
         #${CONFIG.PANEL_ID} .asin-check { width: 16px; height: 16px; flex: 0 0 auto; accent-color: ${CONFIG.THEME_COLOR}; }
         #${CONFIG.PANEL_ID} .asin-only {
@@ -920,7 +921,9 @@
                         <input class="asin-check" type="checkbox" data-candidate-category="${category}" data-candidate-asin="${candidate.asin}" ${checked}>
                         <a class="asin-link" href="${asinUrl(candidate.asin)}" target="_blank">${candidate.asin}</a>
                     </label>
-                    ${candidate.image ? `<img class="asin-img" src="${escapeHtml(candidate.image)}" alt="">` : `<div class="asin-img"></div>`}
+                    ${candidate.image
+                        ? `<img class="asin-img" src="${escapeHtml(candidate.image)}" alt="" data-toggle-candidate="${category}:${candidate.asin}">`
+                        : `<div class="asin-img" data-toggle-candidate="${category}:${candidate.asin}"></div>`}
                 </div>
             </div>
         `;
@@ -996,6 +999,16 @@
                 else state.selected[category].delete(asin);
                 const counter = body.querySelector(`[data-section-count="${category}"]`);
                 if (counter) counter.textContent = `${getSelectedCandidates(category).length}/${(state.candidates[category] || []).length} selected`;
+            });
+        });
+
+        body.querySelectorAll("[data-toggle-candidate]").forEach((image) => {
+            image.addEventListener("click", () => {
+                const [category, asin] = image.getAttribute("data-toggle-candidate").split(":");
+                const checkbox = body.querySelector(`[data-candidate-category="${category}"][data-candidate-asin="${asin}"]`);
+                if (!checkbox) return;
+                checkbox.checked = !checkbox.checked;
+                checkbox.dispatchEvent(new Event("change", { bubbles: true }));
             });
         });
     }
