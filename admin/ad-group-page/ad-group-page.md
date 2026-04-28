@@ -1,4 +1,4 @@
-# Ad Group 頁面中文說明
+# Ad Group 頁面說明
 
 這份 Tampermonkey 腳本用來強化 Hourloop Amazon Ads 後台的 Ad Group 頁面，重點放在更穩定的批次勾選、快捷操作，以及排序後仍維持捲動位置。
 

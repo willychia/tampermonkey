@@ -17,16 +17,18 @@
 - `admin/shared/tabulator-page-utils.js`
   共用工具，提供 Tabulator 頁面腳本使用的 helper functions。
 
-## 中文說明文件
+## 說明文件
 
-- `amazon/detail-page-to-product-targeting/detail-page-to-product-targeting_zh.md`
-  中文說明：Amazon Detail Page Product Targeting 候選面板
-- `admin/product-targeting-page/product-targeting-page_zh.md`
-  中文說明：Product Targeting 頁面腳本
-- `admin/keyword-targeting-page/keyword-targeting-page_zh.md`
-  中文說明：Keyword Targeting 頁面腳本
-- `admin/ad-group-page/ad-group-page_zh.md`
-  中文說明：Ad Group 頁面腳本
+- `amazon/detail-page-to-product-targeting/detail-page-to-product-targeting.md`
+  Amazon Detail Page Product Targeting 候選面板
+- `amazon/search-result-filter/search-result-filter.md`
+  Amazon Search Result Filter 頁面腳本
+- `admin/product-targeting-page/product-targeting-page.md`
+  Product Targeting 頁面腳本
+- `admin/keyword-targeting-page/keyword-targeting-page.md`
+  Keyword Targeting 頁面腳本
+- `admin/ad-group-page/ad-group-page.md`
+  Ad Group 頁面腳本
 
 ## 安裝連結
 
@@ -42,7 +44,7 @@
 - 安裝與更新請使用上方 `.user.js` 連結，Tampermonkey 才會辨識為可安裝的 userscript。
 - Product Targeting 與 Keyword Targeting 會透過 Tampermonkey `@require` 共用 `admin/shared/tabulator-page-utils.js`。
 - Hourloop 後台頁面依賴 Tabulator table，因此相關腳本會讀取頁面上的 Tabulator instance。
-- 各頁面的中文說明文件放在腳本旁邊，檔名以 `_zh.md` 結尾。
+- 各頁面的說明文件放在腳本旁邊。
 - 版本號採用日期格式，方便追蹤每次發布。
 
 ## 建議檢查流程

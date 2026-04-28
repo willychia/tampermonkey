@@ -1,4 +1,4 @@
-# Amazon Detail Product Targeting 面板中文說明
+# Amazon Detail Product Targeting 面板說明
 
 這份 Tampermonkey 腳本用在 Amazon 商品 Detail Page。它會站在目前商品 ASIN 的角度，整理頁面中適合拿來做 Product Targeting 的候選 ASIN，並可用 OpenAI API 產生 Core Keywords 與搜尋連結。
 

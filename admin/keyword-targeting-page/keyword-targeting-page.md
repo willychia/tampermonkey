@@ -1,4 +1,4 @@
-# Keyword Targeting 頁面中文說明
+# Keyword Targeting 頁面說明
 
 這份 Tampermonkey 腳本用來強化 Hourloop Amazon Ads 後台的 Keyword Targeting 頁面，方便快速選取關鍵字、篩出長尾字詞、批次調整 Bid，並保留常用的表格操作捷徑。
 

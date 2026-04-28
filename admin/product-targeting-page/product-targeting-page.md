@@ -1,4 +1,4 @@
-# Product Targeting 頁面中文說明
+# Product Targeting 頁面說明
 
 這份 Tampermonkey 腳本用來強化 Hourloop Amazon Ads 後台的 Product Targeting 頁面，讓你能更快完成勾選、篩選、出價調整與匯出。
 
