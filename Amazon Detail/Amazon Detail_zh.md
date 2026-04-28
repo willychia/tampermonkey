@@ -22,6 +22,9 @@
 - `Cmd/Ctrl + G`：重新掃描目前 Detail Page 並更新面板。
 - `Cmd/Ctrl + D`：複製已勾選的 ASIN，一行一個。
 - `Cmd/Ctrl + B`：顯示或隱藏面板。
+- `Cmd/Ctrl + 1`：開啟 `Substitute` search term 連結。
+- `Cmd/Ctrl + 2`：開啟 `Complementary` search term 連結。
+- `Cmd/Ctrl + 3`：開啟 `Subject/IP` search term 連結。
 
 若游標正在輸入框、文字區塊、下拉選單或可編輯文字區域中，快捷鍵不會觸發。
 

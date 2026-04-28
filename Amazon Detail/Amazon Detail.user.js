@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.17
+// @version      2026.04.28.18
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -982,6 +982,26 @@
         return `https://www.amazon.com/s?${params.toString()}`;
     }
 
+    function strategyIndexForShortcut(key) {
+        return state.keywords.findIndex((item) => {
+            const type = normalizeText(item.type).toLowerCase();
+            if (key === "1") return type === "substitute";
+            if (key === "2") return type === "complementary";
+            if (key === "3") return /^subject(?:\W|_)?ip$/.test(type);
+            return false;
+        });
+    }
+
+    function openStrategySearch(key) {
+        const index = strategyIndexForShortcut(key);
+        const item = index >= 0 ? state.keywords[index] : null;
+        if (!item) {
+            flash(`找不到 Cmd/Ctrl + ${key} 對應的 search term`);
+            return;
+        }
+        window.open(searchUrl(item), "_blank", "noopener");
+    }
+
     function asinUrl(asin) {
         return `https://www.amazon.com/dp/${asin}`;
     }
@@ -1096,7 +1116,7 @@
             ${renderCandidateSection(CATEGORY.COMPLEMENTARY)}
             ${renderCandidateSection(CATEGORY.DIRECT)}
             <div class="hint">
-                Cmd/Ctrl + G 更新 · Cmd/Ctrl + D 複製 · Cmd/Ctrl + B 隱藏/顯示。每區最多 ${CONFIG.MAX_PER_SECTION} 個 ASIN。
+                Cmd/Ctrl + 1/2/3 開啟 Substitute/Complementary/Subject · Cmd/Ctrl + G 更新 · Cmd/Ctrl + D 複製。每區最多 ${CONFIG.MAX_PER_SECTION} 個 ASIN。
             </div>
         `;
 
@@ -1251,6 +1271,10 @@
         if (key === "d") {
             e.preventDefault();
             copySelectedAsins();
+        }
+        if (key === "1" || key === "2" || key === "3") {
+            e.preventDefault();
+            openStrategySearch(key);
         }
         if (key === "b") {
             e.preventDefault();
