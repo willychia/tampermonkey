@@ -9,7 +9,6 @@
 - 從頁面可見推薦模組擷取候選 ASIN 與圖片，並分成：
   - `直接競品`
   - `互補品`
-  - `待確認`
 - 每個分類最多顯示 10 個 ASIN。
 - 候選 ASIN 預設全部勾選；取消勾選後，複製時不會輸出該 ASIN。
 - 同一 ASIN 會自動去重；若出現在多個模組，會合併來源並提高排序。
@@ -49,10 +48,6 @@
 - 配件、替換品、組合購買相關區塊
 
 排序時會優先考慮 Frequently bought together / Buy it with 來源，以及多來源重複出現的 ASIN。
-
-### 待確認
-
-來源語意不明或一般推薦模組中的 ASIN 會放在待確認。這些 ASIN 需要人工判斷是否同用途、互補或不相關。
 
 ## Search Term Strategy 規則
 
@@ -112,8 +107,6 @@ OpenAI 不需要回傳篩選欄位；`minReviews`、`minRating`、`maxRating`、
 - Search Term Strategy 與 Search links
 - 已勾選的 Direct Competitors ASIN 與圖片 URL，最多 10 個
 - 已勾選的 Complementary Products ASIN 與圖片 URL，最多 10 個
-- 已勾選的 Need Review ASIN 與圖片 URL，最多 10 個
-- High Traffic Research Links
 
 若某一區沒有抓到候選，會顯示 `No candidates found on current page`。
 

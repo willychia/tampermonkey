@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.14
+// @version      2026.04.28.15
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -1095,13 +1095,6 @@
             ${renderKeywords()}
             ${renderCandidateSection(CATEGORY.DIRECT)}
             ${renderCandidateSection(CATEGORY.COMPLEMENTARY)}
-            ${renderCandidateSection(CATEGORY.REVIEW)}
-            <h3>High Traffic Research Links</h3>
-            <div class="keyword-row">
-                ${(state.keywords.length ? state.keywords : [{ keyword: product.title || product.asin || "" }]).slice(0, 3).map((item) => `
-                    <div><a class="search-link" target="_blank" href="${searchUrl(item)}">${escapeHtml(item.keyword || "Search current product")}</a></div>
-                `).join("")}
-            </div>
             <div class="hint">
                 Cmd/Ctrl + G 更新 · Cmd/Ctrl + D 複製 · Cmd/Ctrl + B 隱藏/顯示。每區最多 ${CONFIG.MAX_PER_SECTION} 個 ASIN。
             </div>
@@ -1189,8 +1182,7 @@
 
         const direct = state.candidates[CATEGORY.DIRECT].length;
         const comp = state.candidates[CATEGORY.COMPLEMENTARY].length;
-        const review = state.candidates[CATEGORY.REVIEW].length;
-        flash(`已更新：競品 ${direct}、互補 ${comp}、待確認 ${review}，Keywords: ${state.keywordMode}`);
+        flash(`已更新：競品 ${direct}、互補 ${comp}，Keywords: ${state.keywordMode}`);
     }
 
     function formatCandidateList(items) {
@@ -1221,14 +1213,6 @@
             "",
             "## Complementary Products",
             formatCandidateList(getSelectedCandidates(CATEGORY.COMPLEMENTARY)),
-            "",
-            "## Need Review",
-            formatCandidateList(getSelectedCandidates(CATEGORY.REVIEW)),
-            "",
-            "## High Traffic Research Links",
-            state.keywords.length
-                ? state.keywords.slice(0, 3).map((item) => `- ${item.type || "Strategy"} - ${item.keyword}: ${searchUrl(item)}`).join("\n")
-                : `- Search current product: ${searchUrl(product.title || product.asin || "")}`
         ].join("\n");
     }
 
