@@ -1,9 +1,13 @@
 # TamperMonkey Utilities
 
-Tampermonkey scripts for Hourloop Amazon Ads admin pages.
+Tampermonkey scripts for Amazon pages and Hourloop Amazon Ads admin pages.
 
 ## Scripts
 
+- `Amazon Detail/Amazon Detail.user.js`
+  Amazon detail page helpers for Product Targeting candidate ASINs and core keyword research links.
+- `Amazon Search/Amazon Search.user.js`
+  Amazon search result helpers for ASIN filtering and copying.
 - `ads/product_targeting_page/product_targeting_page.user.js`
   Product targeting helpers for bulk selection, ASIN filtering, and bid updates.
 - `ads/keyword_targeting_page/keyword_targeting_page.user.js`
@@ -15,6 +19,8 @@ Tampermonkey scripts for Hourloop Amazon Ads admin pages.
 
 ## Chinese Docs
 
+- `Amazon Detail/Amazon Detail_zh.md`
+  中文說明：Amazon Detail Page Product Targeting 候選面板
 - `ads/product_targeting_page/product_targeting_page_zh.md`
   中文說明：Product Targeting 頁面腳本
 - `ads/keyword_targeting_page/keyword_targeting_page_zh.md`
@@ -24,6 +30,8 @@ Tampermonkey scripts for Hourloop Amazon Ads admin pages.
 
 ## Install Links
 
+- Amazon Detail: `https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Detail/Amazon%20Detail.user.js`
+- Amazon Search: `https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Search/Amazon%20Search.user.js`
 - Product Targeting: `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.user.js`
 - Keyword Targeting: `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/keyword_targeting_page/keyword_targeting_page.user.js`
 - Ad Group: `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.user.js`
