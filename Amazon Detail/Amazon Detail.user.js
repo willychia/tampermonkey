@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.11
+// @version      2026.04.28.12
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -963,7 +963,10 @@
         if (strategy.minReviews !== null && strategy.minReviews !== undefined) params.set("tm_min_reviews", String(strategy.minReviews));
         if (strategy.minRating !== null && strategy.minRating !== undefined) params.set("tm_min_rating", String(strategy.minRating));
         if (strategy.maxRating !== null && strategy.maxRating !== undefined) params.set("tm_max_rating", String(strategy.maxRating));
-        if (strategy.minPrice !== null && strategy.minPrice !== undefined) params.set("tm_min_price", String(strategy.minPrice));
+        if (strategy.minPrice !== null && strategy.minPrice !== undefined) {
+            params.set("tm_min_price", String(strategy.minPrice));
+            params.set("low-price", String(strategy.minPrice));
+        }
         return `https://www.amazon.com/s?${params.toString()}`;
     }
 

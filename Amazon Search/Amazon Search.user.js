@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Amazon Search - Smart Panel & Filter (v2.4.0)
+// @name         Amazon Search - Smart Panel & Filter (v2.4.1)
 // @namespace    https://willy-toolbox.example
-// @version      2.4.0
+// @version      2.4.1
 // @description  支援 Detail Page tm_* 篩選參數、最高評分、面板拖曳、設定記憶、動態載入重掃描與 ASIN 複製。
 // @author       Willy
 // @match        https://www.amazon.com/s?*
@@ -221,29 +221,35 @@
     function applyUrlFilters() {
         const params = new URLSearchParams(location.search);
         const mappings = [
-            ['tm_min_price', 'f-min'],
-            ['tm_min_rating', 'f-rating'],
-            ['tm_max_rating', 'f-max-rating'],
-            ['tm_min_reviews', 'f-reviews']
+            ['tm_min_price', 'f-min', 'Price >= $'],
+            ['tm_min_rating', 'f-rating', 'Rating >= '],
+            ['tm_max_rating', 'f-max-rating', 'Rating <= '],
+            ['tm_min_reviews', 'f-reviews', 'Reviews >= ']
         ];
         let applied = false;
+        const summary = [];
 
-        mappings.forEach(([param, inputId]) => {
+        mappings.forEach(([param, inputId, label]) => {
             const value = params.get(param);
             const input = document.getElementById(inputId);
             if (value !== null && value !== '' && input) {
                 input.value = value;
+                summary.push(`${label}${value}`);
                 applied = true;
             }
         });
 
         const intent = params.get('tm_intent');
         if (intent) {
+            summary.unshift(`Intent: ${intent.replace(/_/g, ' ')}`);
+            applied = true;
+        }
+
+        if (summary.length > 0) {
             panel.querySelector('.hint-box').insertAdjacentHTML(
                 'afterbegin',
-                `<div style="margin-bottom:4px;"><b>Intent</b>: ${intent.replace(/_/g, ' ')}</div>`
+                `<div style="margin-bottom:6px;"><b>Detail filters</b><br>${summary.join('<br>')}</div>`
             );
-            applied = true;
         }
 
         return applied;
