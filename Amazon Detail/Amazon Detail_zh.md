@@ -10,7 +10,7 @@
   - `直接競品`
   - `互補品`
 - 每個分類最多顯示 10 個 ASIN。
-- 候選 ASIN 預設全部勾選；取消勾選後，複製時不會輸出該 ASIN。
+- `互補品` 預設勾選，`直接競品` 預設不勾選；取消勾選後，複製時不會輸出該 ASIN。
 - 同一 ASIN 會自動去重；若出現在多個模組，會合併來源並提高排序。
 - 可使用 OpenAI API 產生 3 組 Search Term Strategy 與 Amazon Search 連結。
 - 若未設定 OpenAI API key，或 API 呼叫失敗，會自動退回規則版 Core Keywords。
@@ -105,8 +105,8 @@ OpenAI 不需要回傳篩選欄位；`minReviews`、`minRating`、`maxRating`、
 
 - 主商品 ASIN、標題、URL
 - Search Term Strategy 與 Search links
-- 已勾選的 Direct Competitors ASIN 與圖片 URL，最多 10 個
 - 已勾選的 Complementary Products ASIN 與圖片 URL，最多 10 個
+- 已勾選的 Direct Competitors ASIN 與圖片 URL，最多 10 個
 
 若某一區沒有抓到候選，會顯示 `No candidates found on current page`。
 

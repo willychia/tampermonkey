@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.15
+// @version      2026.04.28.16
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -988,9 +988,9 @@
 
     function setDefaultSelection() {
         Object.values(CATEGORY).forEach((category) => {
-            state.selected[category] = category === CATEGORY.REVIEW
-                ? new Set()
-                : new Set((state.candidates[category] || []).map((item) => item.asin));
+            state.selected[category] = category === CATEGORY.COMPLEMENTARY
+                ? new Set((state.candidates[category] || []).map((item) => item.asin))
+                : new Set();
         });
     }
 
@@ -1093,8 +1093,8 @@
             ${renderSettings()}
             <h3>Search Term Strategy <span class="section-count">${state.keywords.length}/3</span></h3>
             ${renderKeywords()}
-            ${renderCandidateSection(CATEGORY.DIRECT)}
             ${renderCandidateSection(CATEGORY.COMPLEMENTARY)}
+            ${renderCandidateSection(CATEGORY.DIRECT)}
             <div class="hint">
                 Cmd/Ctrl + G 更新 · Cmd/Ctrl + D 複製 · Cmd/Ctrl + B 隱藏/顯示。每區最多 ${CONFIG.MAX_PER_SECTION} 個 ASIN。
             </div>
@@ -1208,11 +1208,11 @@
             "## Search Term Strategy",
             keywordLines,
             "",
-            "## Direct Competitors",
-            formatCandidateList(getSelectedCandidates(CATEGORY.DIRECT)),
-            "",
             "## Complementary Products",
             formatCandidateList(getSelectedCandidates(CATEGORY.COMPLEMENTARY)),
+            "",
+            "## Direct Competitors",
+            formatCandidateList(getSelectedCandidates(CATEGORY.DIRECT)),
         ].join("\n");
     }
 
