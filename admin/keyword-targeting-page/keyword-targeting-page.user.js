@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Admin - Keyword Targeting Page
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.16.2
+// @version      2026.04.28.1
 // @description  Cmd+A 自動加價儲存，Cmd+D 依 ACOS 預填降價 Bid
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*

@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Amazon - Search Result Filter
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.1
+// @version      2026.04.28.2
 // @description  支援 Detail Page tm_* 篩選參數、最高評分、面板拖曳、設定記憶、動態載入重掃描與 ASIN 複製。
-// @author       Willy
+// @author       Willy Chia
 // @match        https://www.amazon.com/s?*
 // @match        https://www.amazon.co.uk/s?*
 // @match        https://www.amazon.co.jp/s?*
