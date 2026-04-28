@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Amazon Search - Smart Panel & Filter (v2.2.2)
+// @name         Amazon Search - Smart Panel & Filter (v2.3.0)
 // @namespace    https://willy-toolbox.example
-// @version      2.2.2
-// @description  優化 UI：支援面板拖曳、設定記憶、動態載入重掃描、Cmd+B 隱藏面板，並顯示完整商品標題。
+// @version      2.3.0
+// @description  優化 UI：支援面板拖曳、設定記憶、動態載入重掃描、Cmd+B 隱藏面板，並顯示完整商品標題、評分與評論數。
 // @author       Willy
 // @match        https://www.amazon.com/s?*
 // @match        https://www.amazon.co.uk/s?*
@@ -67,6 +67,7 @@
         .amz-asin-action-bar.selected { background-color: ${CONFIG.THEME_COLOR} !important; }
         .bar-asin { font-family: monospace; font-weight: 800; font-size: 18px; }
         .bar-title { font-size: 12px; line-height: 1.35; margin-bottom: 6px; overflow-wrap: anywhere; word-break: normal; }
+        .bar-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; font-size: 12px; color: rgba(255,255,255,0.88); }
         .bar-price { font-size: 16px; font-weight: 800; color: ${CONFIG.PRICE_COLOR}; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 4px; }
 
         .amz-asin-check-wrapper { width: 22px; height: 22px; background: #fff; border-radius: 5px; display: flex; align-items: center; justify-content: center; }
@@ -120,6 +121,8 @@
         <div class="filter-body">
             <div class="filter-group"><label>最大數量 (⌘+G)</label><input type="number" id="f-limit" value="10"></div>
             <div class="filter-group"><label>最低價格</label><input type="number" id="f-min" placeholder="0"></div>
+            <div class="filter-group"><label>最低評分</label><input type="number" id="f-rating" min="0" max="5" step="0.1" placeholder="0-5"></div>
+            <div class="filter-group"><label>最少評論數</label><input type="number" id="f-reviews" min="0" step="1" placeholder="0"></div>
             <div class="filter-group"><label>排除單詞</label><input type="text" id="f-excl"></div>
             <div class="filter-group"><label>包含單詞</label><input type="text" id="f-incl"></div>
         </div>
@@ -246,6 +249,8 @@
         return {
             limit: Math.max(0, parseInt(document.getElementById('f-limit').value, 10) || 10),
             minPrice: parseFloat(document.getElementById('f-min').value) || 0,
+            minRating: parseFloat(document.getElementById('f-rating').value) || 0,
+            minReviews: parseInt(document.getElementById('f-reviews').value, 10) || 0,
             excl: parseTerms(document.getElementById('f-excl').value),
             incl: parseTerms(document.getElementById('f-incl').value)
         };
@@ -299,7 +304,7 @@
 
     function runFilter() {
         pruneProducts();
-        const { limit, minPrice, excl, incl } = getFilterValues();
+        const { limit, minPrice, minRating, minReviews, excl, incl } = getFilterValues();
 
         clearSelected();
 
@@ -309,6 +314,8 @@
             const title = (info.title || getCleanTitle(info.item)).toLowerCase();
             let match = true;
             if (info.price < minPrice) match = false;
+            if (match && minRating > 0 && info.rating < minRating) match = false;
+            if (match && minReviews > 0 && info.reviews < minReviews) match = false;
             if (match && excl.length > 0 && excl.some(w => title.includes(w))) match = false;
             if (match && incl.length > 0 && !incl.every(w => title.includes(w))) match = false;
             if (match) { toggleSelect(info.asin, info.bar, true); count++; }
@@ -327,6 +334,61 @@
             || '$0';
         const priceNum = parseFloat(priceText.replace(/[^0-9.]/g, '')) || 0;
         return { priceText, priceNum };
+    }
+
+    function parseCompactNumber(value) {
+        const text = normalizeProductText(value);
+        const match = text.match(/(\d[\d.,]*)(?:\s*([kKmM]))?/);
+        if (!match) return 0;
+        const suffix = match[2]?.toLowerCase();
+        const numberText = suffix
+            ? match[1].replace(',', '.')
+            : match[1].replace(/[,.]/g, '');
+        const number = parseFloat(numberText);
+        const multiplier = suffix === 'm' ? 1000000 : suffix === 'k' ? 1000 : 1;
+        return Math.round(number * multiplier) || 0;
+    }
+
+    function parseRating(value) {
+        const text = normalizeProductText(value);
+        const match = text.match(/(\d+(?:[.,]\d+)?)/);
+        return match ? parseFloat(match[1].replace(',', '.')) || 0 : 0;
+    }
+
+    function getRatingInfo(item) {
+        const ratingEl = item.querySelector('i.a-icon-star-small span.a-icon-alt, i.a-icon-star span.a-icon-alt, .a-icon-alt');
+        const ratingText = ratingEl?.innerText || ratingEl?.textContent || '';
+        const ratingNum = parseRating(ratingText);
+        return {
+            ratingText: ratingNum ? ratingNum.toFixed(1).replace(/\.0$/, '') : 'No rating',
+            ratingNum
+        };
+    }
+
+    function getReviewsInfo(item) {
+        const selectors = [
+            'a[href*="#customerReviews"] span.a-size-base',
+            'a[href*="customerReviews"] span.a-size-base',
+            'a[aria-label*="ratings"]',
+            'a[aria-label*="rating"]',
+            'span[aria-label*="ratings"]',
+            'span[aria-label*="rating"]'
+        ];
+
+        for (const selector of selectors) {
+            const el = item.querySelector(selector);
+            const raw = el?.getAttribute('aria-label') || el?.innerText || el?.textContent || '';
+            if (/(?:stars?|out of|つ星|星)/i.test(raw)) continue;
+            const reviewsNum = parseCompactNumber(raw);
+            if (reviewsNum) {
+                return {
+                    reviewsText: reviewsNum.toLocaleString('en-US'),
+                    reviewsNum
+                };
+            }
+        }
+
+        return { reviewsText: '0', reviewsNum: 0 };
     }
 
     function pruneProducts() {
@@ -364,6 +426,8 @@
             state.processedItems.add(item);
 
             const { priceText, priceNum } = getPriceInfo(item);
+            const { ratingText, ratingNum } = getRatingInfo(item);
+            const { reviewsText, reviewsNum } = getReviewsInfo(item);
             const title = getProductTitle(item);
 
             const bar = document.createElement('div');
@@ -374,15 +438,18 @@
                     <div class="amz-asin-check-wrapper"><span class="amz-asin-check-icon">✓</span></div>
                 </div>
                 <div class="bar-title"></div>
+                <div class="bar-meta"><span class="bar-rating"></span><span class="bar-reviews"></span></div>
                 <div class="bar-price"></div>
             `;
             bar.querySelector('.bar-title').textContent = title || '(未抓到商品標題)';
+            bar.querySelector('.bar-rating').textContent = `★ ${ratingText}`;
+            bar.querySelector('.bar-reviews').textContent = `評論 ${reviewsText}`;
             bar.querySelector('.bar-price').textContent = priceText;
 
             bar.onclick = (e) => { e.stopPropagation(); toggleSelect(asin, bar, !state.selected.has(asin)); };
             target.parentNode.insertBefore(bar, target);
 
-            state.allProducts.push({ asin, bar, price: priceNum, item: item, title });
+            state.allProducts.push({ asin, bar, price: priceNum, rating: ratingNum, reviews: reviewsNum, item: item, title });
             syncAsinBars(asin);
 
             if (state.autoPickCounted < 10) { toggleSelect(asin, bar, true); state.autoPickCounted++; }
