@@ -79,11 +79,9 @@ OpenAI 回傳格式會被解析成：
 - type
 - search term
 - score
-- minReviews
-- minRating
-- maxRating
-- minPrice
 - reason
+
+OpenAI 不需要回傳篩選欄位；`minReviews`、`minRating`、`maxRating`、`minPrice` 會由腳本依策略類型硬套。
 
 若沒有設定 API key，或 OpenAI 呼叫失敗，腳本會使用內建規則產生這三組策略。
 

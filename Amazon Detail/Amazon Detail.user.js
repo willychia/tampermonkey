@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.13
+// @version      2026.04.28.14
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -862,10 +862,6 @@
                 type: normalizeText(item.type || item.intent || `Strategy ${index + 1}`),
                 keyword: normalizeText(item.searchTerm || item.keyword || item),
                 score: Number.isFinite(Number(item.score)) ? Number(item.score) : Math.max(100 - index * 8, 60),
-                minReviews: Number.isFinite(Number(item.minReviews)) ? Number(item.minReviews) : null,
-                minRating: Number.isFinite(Number(item.minRating)) ? Number(item.minRating) : null,
-                maxRating: Number.isFinite(Number(item.maxRating)) ? Number(item.maxRating) : null,
-                minPrice: Number.isFinite(Number(item.minPrice)) ? Number(item.minPrice) : null,
                 sources: [normalizeText(item.reason || item.filterDirection || "OpenAI").replace(/\s+/g, " ") || "OpenAI"]
             }))
             .filter((item) => item.keyword)
@@ -910,14 +906,13 @@
         return [
             "You generate Amazon Product Targeting search term strategies.",
             "Return strict JSON only with this shape:",
-            "{\"strategies\":[{\"type\":\"Substitute\",\"searchTerm\":\"2-5 word search term\",\"score\":95,\"minReviews\":null,\"minRating\":null,\"maxRating\":4.2,\"minPrice\":20,\"reason\":\"short reason\"}]}",
+            "{\"strategies\":[{\"type\":\"Substitute\",\"searchTerm\":\"2-5 word search term\",\"score\":95,\"reason\":\"short reason\"}]}",
             "Rules:",
             "- Generate exactly 3 strategies: Substitute, Complementary, Subject/IP.",
             "- Substitute: find direct alternatives where shoppers may switch to this product. The script will hard-code Substitute filters after your response: minPrice equals the current product price, maxRating equals max(current rating, 3), minReviews is null, and minRating is null. Focus on the best Substitute search term.",
             "- Complementary: find healthy related products shoppers may buy before or with this product. The script will hard-code Complementary filters after your response: minRating 4, minReviews 50, minPrice null, maxRating null. Focus on the best Complementary search term.",
             "- Subject/IP: if the product has a clear subject, franchise, character, licensed IP, theme, or named object, generate one search term for that subject/IP. If none exists, use a strong category/theme term. The script will hard-code Subject/IP filters after your response: minRating 4, minReviews 50, minPrice null, maxRating null.",
-            "- Do not use maxPrice, include, exclude, or limit.",
-            "- If a filter is not appropriate, return null.",
+            "- Do not return filter fields such as minReviews, minRating, maxRating, minPrice, maxPrice, include, exclude, or limit.",
             "- Search terms should be concise English phrases.",
             "",
             `ASIN: ${product.asin || ""}`,
