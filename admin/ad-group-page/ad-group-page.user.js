@@ -1,11 +1,11 @@
 // ==UserScript==
-// @name         Ad Group Page Additional Functions (Optimized V8)
+// @name         Ads Team Toolbox - Admin - Ad Group Page
 // @namespace    http://tampermonkey.net/
 // @version      2026.04.08.1
 // @description  修正跳頂問題、優化選取邏輯、強化捲軸位置保持。
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.user.js
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.user.js
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/ad-group-page/ad-group-page.user.js
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/ad-group-page/ad-group-page.user.js
 // @run-at       document-idle
 // @grant        none
 // ==/UserScript==

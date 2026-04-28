@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Amazon Detail - Product Targeting Panel
+// @name         Ads Team Toolbox - Amazon - Detail Page to Product Targeting
 // @namespace    https://willy-toolbox.example
 // @version      2026.04.28.18
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
@@ -7,8 +7,8 @@
 // @match        https://www.amazon.com/dp/*
 // @match        https://www.amazon.com/*/dp/*
 // @match        https://www.amazon.com/gp/product/*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Detail/Amazon%20Detail.user.js
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Detail/Amazon%20Detail.user.js
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/amazon/detail-page-to-product-targeting/detail-page-to-product-targeting.user.js
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/amazon/detail-page-to-product-targeting/detail-page-to-product-targeting.user.js
 // @grant        GM_addStyle
 // @grant        GM_setClipboard
 // @grant        GM_getValue

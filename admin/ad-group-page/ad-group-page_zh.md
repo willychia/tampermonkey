@@ -41,7 +41,7 @@
 
 1. 安裝 [Tampermonkey](https://www.tampermonkey.net/)
 2. 開啟下列安裝連結：
-   `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/ad_group_page/ad_group_page.user.js`
+   `https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/ad-group-page/ad-group-page.user.js`
 3. 在 Tampermonkey 中確認安裝並啟用腳本
 4. 重新整理 Ad Group 頁面後開始使用
 

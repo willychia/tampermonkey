@@ -121,7 +121,7 @@ OpenAI 不需要回傳篩選欄位；`minReviews`、`minRating`、`maxRating`、
 
 1. 安裝 [Tampermonkey](https://www.tampermonkey.net/)
 2. 開啟下列安裝連結：
-   `https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Detail/Amazon%20Detail.user.js`
+   `https://raw.githubusercontent.com/willychia/tampermonkey/main/amazon/detail-page-to-product-targeting/detail-page-to-product-targeting.user.js`
 3. 在 Tampermonkey 中確認安裝並啟用腳本。
 4. 開啟 Amazon 商品 Detail Page 後使用快捷鍵。
 

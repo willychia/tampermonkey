@@ -59,12 +59,12 @@
 
 1. 安裝 [Tampermonkey](https://www.tampermonkey.net/)
 2. 開啟下列安裝連結：
-   `https://raw.githubusercontent.com/willychia/tampermonkey/main/ads/product_targeting_page/product_targeting_page.user.js`
+   `https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/product-targeting-page/product-targeting-page.user.js`
 3. 在 Tampermonkey 中確認安裝並啟用腳本
 4. 重新整理 Product Targeting 頁面後開始使用
 
 ## 注意事項
 
-- 本腳本依賴 `ads/shared/tabulator_page_utils.js`，會透過 `@require` 自動載入。
+- 本腳本依賴 `admin/shared/tabulator-page-utils.js`，會透過 `@require` 自動載入。
 - 頁面重新渲染後，腳本會自動重新綁定 Tabulator，不需要手動重裝。
 - 建議先在小量資料上測試快捷鍵與自動調價流程，再批次操作。

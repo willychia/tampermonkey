@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         Amazon Search - Smart Panel & Filter
+// @name         Ads Team Toolbox - Amazon - Search Result Filter
 // @namespace    https://willy-toolbox.example
 // @version      2026.04.28.1
 // @description  支援 Detail Page tm_* 篩選參數、最高評分、面板拖曳、設定記憶、動態載入重掃描與 ASIN 複製。
@@ -7,8 +7,8 @@
 // @match        https://www.amazon.com/s?*
 // @match        https://www.amazon.co.uk/s?*
 // @match        https://www.amazon.co.jp/s?*
-// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Search/Amazon%20Search.user.js
-// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/Amazon%20Search/Amazon%20Search.user.js
+// @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/amazon/search-result-filter/search-result-filter.user.js
+// @downloadURL  https://raw.githubusercontent.com/willychia/tampermonkey/main/amazon/search-result-filter/search-result-filter.user.js
 // @grant        GM_addStyle
 // @grant        GM_setClipboard
 // ==/UserScript==
