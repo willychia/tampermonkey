@@ -56,7 +56,7 @@
 
 ## Search Term Strategy 規則
 
-面板提供 OpenAI API key 與 model 欄位。儲存後，`Cmd/Ctrl + G` 會把目前商品資訊送到 OpenAI，要求回傳 3 組適合用來搜尋 Product Targeting ASIN 的 search term strategy。
+面板提供 OpenAI API key 與 model 欄位。儲存後，`Cmd/Ctrl + G` 會把目前商品資訊與主圖送到 OpenAI，要求回傳 3 組適合用來搜尋 Product Targeting ASIN 的 search term strategy。
 
 三組策略為：
 
@@ -68,6 +68,7 @@
 
 - 商品標題
 - 品牌
+- Main image URL 與圖片內容
 - Bullet points
 - Breadcrumb / 類目
 - BSR / 類目文字

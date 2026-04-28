@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.12
+// @version      2026.04.28.13
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -926,11 +926,28 @@
             `Current Price: ${product.price || ""}`,
             `Current Rating: ${product.rating || ""}`,
             `Current Reviews: ${product.reviews || ""}`,
+            `Main Image URL: ${product.image || ""}`,
             `Breadcrumbs: ${(product.breadcrumbs || []).join(" > ")}`,
             `BSR/Category Text: ${(product.bsrTexts || []).join(" | ")}`,
             `Bullets: ${(product.bullets || []).slice(0, 5).join(" | ")}`,
             `Variation Text: ${product.variationText || ""}`
         ].join("\n");
+    }
+
+    function buildOpenAiInput(product) {
+        const content = [
+            { type: "input_text", text: buildOpenAiPrompt(product) }
+        ];
+
+        if (product.image) {
+            content.push({
+                type: "input_image",
+                image_url: product.image,
+                detail: "auto"
+            });
+        }
+
+        return [{ role: "user", content }];
     }
 
     async function generateOpenAiKeywords(product) {
@@ -945,7 +962,7 @@
             },
             data: {
                 model: getOpenAiModel(),
-                input: buildOpenAiPrompt(product),
+                input: buildOpenAiInput(product),
                 max_output_tokens: 700
             }
         });
