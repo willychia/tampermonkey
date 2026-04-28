@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.5
+// @version      2026.04.28.6
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -419,11 +419,57 @@
         return match ? `${match[1]}★` : "";
     }
 
+    function normalizeAmazonImageUrl(url) {
+        if (!url || /transparent-pixel|grey-pixel|sprite/i.test(url)) return "";
+        const cleanUrl = url.split("?")[0];
+        return cleanUrl.replace(/\._[^.]+_\.(jpg|jpeg|png|webp)$/i, ".$1");
+    }
+
+    function parseDynamicImageCandidates(value) {
+        if (!value) return [];
+        try {
+            return Object.entries(JSON.parse(value)).map(([url, size]) => ({
+                url,
+                score: (parseInt(size?.[0], 10) || 0) * (parseInt(size?.[1], 10) || 0)
+            }));
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function parseSrcsetCandidates(value) {
+        if (!value) return [];
+        return value.split(",")
+            .map((part) => {
+                const pieces = normalizeText(part).split(/\s+/);
+                const url = pieces[0] || "";
+                const descriptor = pieces[1] || "";
+                const width = parseInt(descriptor.replace(/\D/g, ""), 10) || 0;
+                return { url, score: width };
+            })
+            .filter((item) => item.url);
+    }
+
+    function getBestImageUrl(img) {
+        if (!img) return "";
+        const candidates = [
+            ...parseDynamicImageCandidates(img.getAttribute("data-a-dynamic-image")),
+            ...parseSrcsetCandidates(img.getAttribute("srcset")),
+            { url: img.getAttribute("data-old-hires") || "", score: 1000000 },
+            { url: img.currentSrc || "", score: 1000 },
+            { url: img.src || "", score: 900 },
+            { url: img.getAttribute("data-src") || "", score: 800 }
+        ]
+            .map((item) => ({ ...item, url: normalizeAmazonImageUrl(item.url) }))
+            .filter((item) => item.url);
+
+        candidates.sort((a, b) => b.score - a.score || b.url.length - a.url.length);
+        return candidates[0]?.url || "";
+    }
+
     function getImageFromNode(node) {
         const img = node.querySelector("img");
-        if (!img) return "";
-        const src = img.currentSrc || img.src || img.getAttribute("data-src") || "";
-        return src && !/transparent-pixel|grey-pixel|sprite/i.test(src) ? src : "";
+        return getBestImageUrl(img);
     }
 
     function getBrand() {
@@ -482,10 +528,7 @@
             asin: getCurrentAsin(),
             title: normalizeText(document.querySelector("#productTitle")?.textContent),
             brand: getBrand(),
-            image: document.querySelector("#landingImage")?.currentSrc
-                || document.querySelector("#landingImage")?.src
-                || document.querySelector("#imgTagWrapperId img")?.src
-                || "",
+            image: getBestImageUrl(document.querySelector("#landingImage") || document.querySelector("#imgTagWrapperId img")),
             breadcrumbs: getBreadcrumbs(),
             bullets: getBullets(),
             bsrTexts: getBsrTexts(),
