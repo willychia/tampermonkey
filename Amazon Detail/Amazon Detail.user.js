@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.4
+// @version      2026.04.28.5
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -817,7 +817,9 @@
 
     function setDefaultSelection() {
         Object.values(CATEGORY).forEach((category) => {
-            state.selected[category] = new Set((state.candidates[category] || []).map((item) => item.asin));
+            state.selected[category] = category === CATEGORY.REVIEW
+                ? new Set()
+                : new Set((state.candidates[category] || []).map((item) => item.asin));
         });
     }
 
