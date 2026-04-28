@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.8
+// @version      2026.04.28.11
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -787,41 +787,27 @@
         const subject = product.brand && !/amazon/i.test(product.brand)
             ? `${product.brand} ${primary}`.trim()
             : category;
-        const currentRating = product.rating || 0;
-        const currentPrice = product.price || 0;
 
         return [
-            {
+            enforceSubstituteFilters({
                 type: "Substitute",
                 keyword: primary,
                 score: 90,
-                minReviews: product.reviews >= 200 ? 50 : 20,
-                minRating: null,
-                maxRating: currentRating ? Math.max(3.2, Math.round((currentRating - 0.1) * 10) / 10) : 4.2,
-                minPrice: currentPrice >= 10 ? Math.max(3, Math.round(currentPrice * 0.4)) : null,
                 sources: ["Rule fallback: weaker direct alternatives with traffic"]
-            },
+            }, product),
             {
                 type: "Complementary",
                 keyword: `${category} accessories`.replace(/\s+/g, " ").trim(),
                 score: 82,
-                minReviews: 30,
-                minRating: 4,
-                maxRating: null,
-                minPrice: null,
                 sources: ["Rule fallback: healthy related products"]
             },
             {
                 type: "Subject/IP",
                 keyword: subject,
                 score: 78,
-                minReviews: 30,
-                minRating: 4,
-                maxRating: null,
-                minPrice: null,
                 sources: ["Rule fallback: subject, brand, or theme products"]
             }
-        ].filter((item) => item.keyword).slice(0, 3);
+        ].map((item) => enforceStrategyFilters(item, product)).filter((item) => item.keyword).slice(0, 3);
     }
 
     function gmRequestJson(options) {
@@ -886,16 +872,50 @@
             .slice(0, 3);
     }
 
+    function isSubstituteStrategy(item) {
+        return /^substitute$/i.test(normalizeText(item?.type || item?.intent || ""));
+    }
+
+    function isHealthyStrategy(item) {
+        return /^(complementary|subject\/?ip)$/i.test(normalizeText(item?.type || item?.intent || ""));
+    }
+
+    function enforceSubstituteFilters(item, product) {
+        if (!item || !isSubstituteStrategy(item)) return item;
+        return {
+            ...item,
+            minReviews: null,
+            minRating: null,
+            maxRating: Math.max(product.rating || 0, 3),
+            minPrice: product.price || null
+        };
+    }
+
+    function enforceHealthyProductFilters(item) {
+        if (!item || !isHealthyStrategy(item)) return item;
+        return {
+            ...item,
+            minReviews: 50,
+            minRating: 4,
+            maxRating: null,
+            minPrice: null
+        };
+    }
+
+    function enforceStrategyFilters(item, product) {
+        return enforceHealthyProductFilters(enforceSubstituteFilters(item, product));
+    }
+
     function buildOpenAiPrompt(product) {
         return [
             "You generate Amazon Product Targeting search term strategies.",
             "Return strict JSON only with this shape:",
-            "{\"strategies\":[{\"type\":\"Substitute\",\"searchTerm\":\"2-5 word search term\",\"score\":95,\"minReviews\":50,\"minRating\":null,\"maxRating\":4.2,\"minPrice\":5,\"reason\":\"short reason\"}]}",
+            "{\"strategies\":[{\"type\":\"Substitute\",\"searchTerm\":\"2-5 word search term\",\"score\":95,\"minReviews\":null,\"minRating\":null,\"maxRating\":4.2,\"minPrice\":20,\"reason\":\"short reason\"}]}",
             "Rules:",
             "- Generate exactly 3 strategies: Substitute, Complementary, Subject/IP.",
-            "- Substitute: find weaker direct alternatives where shoppers may switch to this product. Prefer filters that capture worse-than-current products but still have traffic. Use maxRating when current rating is known. Use minReviews for traffic. Use minPrice only to avoid tiny irrelevant low-price items.",
-            "- Complementary: find healthy related products shoppers may buy before or with this product. Do not compare against current product; use minRating and minReviews for quality/traffic. minPrice is usually null unless needed to remove tiny accessories.",
-            "- Subject/IP: if the product has a clear subject, franchise, character, licensed IP, theme, or named object, generate one search term for that subject/IP. If none exists, use a strong category/theme term. Filter for healthy products with minRating and minReviews.",
+            "- Substitute: find direct alternatives where shoppers may switch to this product. The script will hard-code Substitute filters after your response: minPrice equals the current product price, maxRating equals max(current rating, 3), minReviews is null, and minRating is null. Focus on the best Substitute search term.",
+            "- Complementary: find healthy related products shoppers may buy before or with this product. The script will hard-code Complementary filters after your response: minRating 4, minReviews 50, minPrice null, maxRating null. Focus on the best Complementary search term.",
+            "- Subject/IP: if the product has a clear subject, franchise, character, licensed IP, theme, or named object, generate one search term for that subject/IP. If none exists, use a strong category/theme term. The script will hard-code Subject/IP filters after your response: minRating 4, minReviews 50, minPrice null, maxRating null.",
             "- Do not use maxPrice, include, exclude, or limit.",
             "- If a filter is not appropriate, return null.",
             "- Search terms should be concise English phrases.",
@@ -930,7 +950,8 @@
             }
         });
 
-        const keywords = parseKeywordJson(extractResponseText(response));
+        const keywords = parseKeywordJson(extractResponseText(response))
+            .map((item) => enforceStrategyFilters(item, product));
         return keywords.length ? keywords : null;
     }
 
@@ -1043,10 +1064,16 @@
     function renderPanel() {
         const body = panel.querySelector(".panel-body");
         const product = state.product || getProductInfo();
+        const productMeta = [
+            product.price ? `Price: $${product.price}` : "Price: not found",
+            product.rating ? `Rating: ${product.rating}` : "Rating: not found",
+            product.reviews ? `Reviews: ${product.reviews}` : "Reviews: not found"
+        ].join(" · ");
         body.innerHTML = `
             <div class="pt-summary">
                 <div><span class="pt-asin">${escapeHtml(product.asin || "ASIN not found")}</span></div>
                 <div>${escapeHtml(product.title || "Title not found")}</div>
+                <div class="score">${escapeHtml(productMeta)}</div>
             </div>
             ${renderSettings()}
             <h3>Search Term Strategy <span class="section-count">${state.keywords.length}/3</span></h3>

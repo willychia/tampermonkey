@@ -60,9 +60,9 @@
 
 三組策略為：
 
-- `Substitute`：找比目前產品弱、但仍有流量的直接替代競品。會傾向使用 `maxRating`、`minReviews`，必要時使用 `minPrice` 排除太低價雜訊。
-- `Complementary`：找不需要與目前產品比較、但情況優良的互補商品。會傾向使用 `minRating` 與 `minReviews`。
-- `Subject/IP`：如果產品有明確 subject、主題、角色、品牌 IP 或重點命名物件，會抓出一組相關 search term，並篩選情況優良的產品。
+- `Substitute`：找比目前產品弱的直接替代競品。篩選會固定為價格高於目前產品、rating 低於 `Max(目前 rating, 3)`，reviews 不限制。
+- `Complementary`：找不需要與目前產品比較、但情況優良的互補商品。篩選固定為價格不限制、rating 大於 4、reviews 大於 50。
+- `Subject/IP`：如果產品有明確 subject、主題、角色、品牌 IP 或重點命名物件，會抓出一組相關 search term。篩選固定為價格不限制、rating 大於 4、reviews 大於 50。
 
 送出的資料包含：
 
