@@ -6,7 +6,7 @@
 
 - 在商品頁右側顯示 Product Targeting 候選面板。
 - 自動取得目前商品 ASIN、標題與網址。
-- 從頁面可見推薦模組擷取候選 ASIN、圖片、標題、價格與評分，並分成：
+- 從頁面可見推薦模組擷取候選 ASIN 與圖片，並分成：
   - `直接競品`
   - `互補品`
   - `待確認`
@@ -37,7 +37,7 @@
 - Customers also viewed
 - Products related to this item
 
-排序時會優先考慮 Compare / Similar 來源、多來源重複出現，以及有標題、價格、評分資料的 ASIN。
+排序時會優先考慮 Compare / Similar 來源、多來源重複出現，以及有圖片資料的 ASIN。
 
 ### 互補品
 
@@ -100,10 +100,9 @@ OpenAI 回傳格式會被解析成：
 
 - 主商品 ASIN、標題、URL
 - Core Keywords 與 Search links
-- 已勾選的 Direct Competitors，最多 10 個
-- 已勾選的 Complementary Products，最多 10 個
-- 已勾選的 Need Review，最多 10 個
-- 候選 ASIN 圖片 URL，如果頁面可取得
+- 已勾選的 Direct Competitors ASIN 與圖片 URL，最多 10 個
+- 已勾選的 Complementary Products ASIN 與圖片 URL，最多 10 個
+- 已勾選的 Need Review ASIN 與圖片 URL，最多 10 個
 - High Traffic Research Links
 
 若某一區沒有抓到候選，會顯示 `No candidates found on current page`。

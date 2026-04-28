@@ -5,7 +5,7 @@ Tampermonkey scripts for Amazon pages and Hourloop Amazon Ads admin pages.
 ## Scripts
 
 - `Amazon Detail/Amazon Detail.user.js`
-  Amazon detail page helpers for Product Targeting candidate ASINs, product images, selection, and OpenAI core keyword research links.
+  Amazon detail page helpers for Product Targeting candidate ASINs, larger product images, selection, and OpenAI core keyword research links.
 - `Amazon Search/Amazon Search.user.js`
   Amazon search result helpers for ASIN filtering and copying.
 - `ads/product_targeting_page/product_targeting_page.user.js`

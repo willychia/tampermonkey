@@ -23,7 +23,7 @@
     const CONFIG = {
         MAX_PER_SECTION: 10,
         MAX_KEYWORDS: 5,
-        DEFAULT_MODEL: "gpt-4.1-mini",
+        DEFAULT_MODEL: "gpt-5.4-nano",
         PANEL_ID: "amz-detail-pt-panel",
         RESCUE_ID: "amz-detail-pt-rescue",
         STORAGE_KEY: "amz-detail-product-targeting-v1",
@@ -172,17 +172,18 @@
         #${CONFIG.PANEL_ID} .keyword-input {
             flex: 1; min-width: 0; border: 1px solid #ddd; border-radius: 5px; padding: 4px 6px; font-size: 12px;
         }
-        #${CONFIG.PANEL_ID} .score,
-        #${CONFIG.PANEL_ID} .source,
-        #${CONFIG.PANEL_ID} .meta { color: #666; font-size: 11px; line-height: 1.35; margin-top: 4px; }
+        #${CONFIG.PANEL_ID} .score { color: #666; font-size: 11px; line-height: 1.35; margin-top: 4px; }
         #${CONFIG.PANEL_ID} .asin-link,
         #${CONFIG.PANEL_ID} .search-link { color: #0066c0; text-decoration: none; font-weight: 700; }
-        #${CONFIG.PANEL_ID} .asin-main { display: grid; grid-template-columns: 44px 1fr; gap: 8px; margin-top: 6px; }
+        #${CONFIG.PANEL_ID} .asin-main { display: grid; grid-template-columns: 96px 1fr; gap: 10px; margin-top: 6px; align-items: center; }
         #${CONFIG.PANEL_ID} .asin-img {
-            width: 44px; height: 44px; border-radius: 6px; object-fit: contain; background: #f7f7f7; border: 1px solid #eee;
+            width: 96px; height: 96px; border-radius: 6px; object-fit: contain; background: #f7f7f7; border: 1px solid #eee;
         }
         #${CONFIG.PANEL_ID} .asin-check { width: 16px; height: 16px; flex: 0 0 auto; accent-color: ${CONFIG.THEME_COLOR}; }
-        #${CONFIG.PANEL_ID} .asin-title { color: #333; line-height: 1.3; overflow-wrap: anywhere; }
+        #${CONFIG.PANEL_ID} .asin-only {
+            display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 15px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 800;
+        }
         #${CONFIG.PANEL_ID} .empty { color: #777; font-size: 12px; padding: 8px; border: 1px dashed #ccc; border-radius: 8px; }
         #${CONFIG.PANEL_ID} .hint {
             margin-top: 12px; padding-top: 9px; border-top: 1px solid #eee; color: #666; line-height: 1.45; font-size: 11px;
@@ -866,26 +867,16 @@
     }
 
     function renderCandidate(candidate, category) {
-        const title = candidate.title ? `<div class="asin-title">${escapeHtml(candidate.title)}</div>` : `<div class="asin-title">Title not found</div>`;
-        const meta = [candidate.price, candidate.rating].filter(Boolean).join(" · ");
         const checked = isCandidateSelected(category, candidate.asin) ? "checked" : "";
         return `
             <div class="asin-row">
-                <div class="asin-top">
-                    <label style="display:flex;align-items:center;gap:6px;min-width:0;">
+                <div class="asin-main">
+                    ${candidate.image ? `<img class="asin-img" src="${escapeHtml(candidate.image)}" alt="">` : `<div class="asin-img"></div>`}
+                    <label class="asin-only">
                         <input class="asin-check" type="checkbox" data-candidate-category="${category}" data-candidate-asin="${candidate.asin}" ${checked}>
                         <a class="asin-link" href="${asinUrl(candidate.asin)}" target="_blank">${candidate.asin}</a>
                     </label>
-                    <span class="score">score ${candidate.score}</span>
                 </div>
-                <div class="asin-main">
-                    ${candidate.image ? `<img class="asin-img" src="${escapeHtml(candidate.image)}" alt="">` : `<div class="asin-img"></div>`}
-                    <div>
-                        ${title}
-                        ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ""}
-                    </div>
-                </div>
-                <div class="source">${escapeHtml(candidate.sources.slice(0, 2).join(" / "))}</div>
             </div>
         `;
     }
@@ -1003,10 +994,8 @@
     function formatCandidateList(items) {
         if (!items || items.length === 0) return "No candidates found on current page";
         return items.map((item) => {
-            const title = item.title ? ` - ${item.title}` : "";
-            const source = item.sources.length ? ` (${item.sources.slice(0, 2).join(" / ")})` : "";
             const image = item.image ? `\n  Image: ${item.image}` : "";
-            return `- ${item.asin}${title}${source}${image}`;
+            return `- ${item.asin}${image}`;
         }).join("\n");
     }
 
