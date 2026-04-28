@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.3
+// @version      2026.04.28.4
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -175,9 +175,9 @@
         #${CONFIG.PANEL_ID} .score { color: #666; font-size: 11px; line-height: 1.35; margin-top: 4px; }
         #${CONFIG.PANEL_ID} .asin-link,
         #${CONFIG.PANEL_ID} .search-link { color: #0066c0; text-decoration: none; font-weight: 700; }
-        #${CONFIG.PANEL_ID} .asin-main { display: grid; grid-template-columns: 96px 1fr; gap: 10px; margin-top: 6px; align-items: center; }
+        #${CONFIG.PANEL_ID} .asin-main { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
         #${CONFIG.PANEL_ID} .asin-img {
-            width: 96px; height: 96px; border-radius: 6px; object-fit: contain; background: #f7f7f7; border: 1px solid #eee;
+            width: 100%; height: 220px; border-radius: 6px; object-fit: contain; background: #f7f7f7; border: 1px solid #eee;
         }
         #${CONFIG.PANEL_ID} .asin-check { width: 16px; height: 16px; flex: 0 0 auto; accent-color: ${CONFIG.THEME_COLOR}; }
         #${CONFIG.PANEL_ID} .asin-only {
@@ -871,11 +871,11 @@
         return `
             <div class="asin-row">
                 <div class="asin-main">
-                    ${candidate.image ? `<img class="asin-img" src="${escapeHtml(candidate.image)}" alt="">` : `<div class="asin-img"></div>`}
                     <label class="asin-only">
                         <input class="asin-check" type="checkbox" data-candidate-category="${category}" data-candidate-asin="${candidate.asin}" ${checked}>
                         <a class="asin-link" href="${asinUrl(candidate.asin)}" target="_blank">${candidate.asin}</a>
                     </label>
+                    ${candidate.image ? `<img class="asin-img" src="${escapeHtml(candidate.image)}" alt="">` : `<div class="asin-img"></div>`}
                 </div>
             </div>
         `;
