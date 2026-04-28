@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Amazon Search - Smart Panel & Filter (v2.3.0)
+// @name         Amazon Search - Smart Panel & Filter (v2.4.0)
 // @namespace    https://willy-toolbox.example
-// @version      2.3.0
-// @description  優化 UI：支援面板拖曳、設定記憶、動態載入重掃描、Cmd+B 隱藏面板，並顯示完整商品標題、評分與評論數。
+// @version      2.4.0
+// @description  支援 Detail Page tm_* 篩選參數、最高評分、面板拖曳、設定記憶、動態載入重掃描與 ASIN 複製。
 // @author       Willy
 // @match        https://www.amazon.com/s?*
 // @match        https://www.amazon.co.uk/s?*
@@ -122,6 +122,7 @@
             <div class="filter-group"><label>最大數量 (⌘+G)</label><input type="number" id="f-limit" value="10"></div>
             <div class="filter-group"><label>最低價格</label><input type="number" id="f-min" placeholder="0"></div>
             <div class="filter-group"><label>最低評分</label><input type="number" id="f-rating" min="0" max="5" step="0.1" placeholder="0-5"></div>
+            <div class="filter-group"><label>最高評分</label><input type="number" id="f-max-rating" min="0" max="5" step="0.1" placeholder="0-5"></div>
             <div class="filter-group"><label>最少評論數</label><input type="number" id="f-reviews" min="0" step="1" placeholder="0"></div>
             <div class="filter-group"><label>排除單詞</label><input type="text" id="f-excl"></div>
             <div class="filter-group"><label>包含單詞</label><input type="text" id="f-incl"></div>
@@ -217,6 +218,37 @@
         state.flashTimer = setTimeout(() => (flashEl.style.display = 'none'), 2000);
     }
 
+    function applyUrlFilters() {
+        const params = new URLSearchParams(location.search);
+        const mappings = [
+            ['tm_min_price', 'f-min'],
+            ['tm_min_rating', 'f-rating'],
+            ['tm_max_rating', 'f-max-rating'],
+            ['tm_min_reviews', 'f-reviews']
+        ];
+        let applied = false;
+
+        mappings.forEach(([param, inputId]) => {
+            const value = params.get(param);
+            const input = document.getElementById(inputId);
+            if (value !== null && value !== '' && input) {
+                input.value = value;
+                applied = true;
+            }
+        });
+
+        const intent = params.get('tm_intent');
+        if (intent) {
+            panel.querySelector('.hint-box').insertAdjacentHTML(
+                'afterbegin',
+                `<div style="margin-bottom:4px;"><b>Intent</b>: ${intent.replace(/_/g, ' ')}</div>`
+            );
+            applied = true;
+        }
+
+        return applied;
+    }
+
     function updateCountUI() { document.getElementById('main-count').textContent = state.selected.size; }
     function toggleSelect(asin, barEl, isSelected) {
         if (isSelected) {
@@ -250,6 +282,7 @@
             limit: Math.max(0, parseInt(document.getElementById('f-limit').value, 10) || 10),
             minPrice: parseFloat(document.getElementById('f-min').value) || 0,
             minRating: parseFloat(document.getElementById('f-rating').value) || 0,
+            maxRating: parseFloat(document.getElementById('f-max-rating').value) || 0,
             minReviews: parseInt(document.getElementById('f-reviews').value, 10) || 0,
             excl: parseTerms(document.getElementById('f-excl').value),
             incl: parseTerms(document.getElementById('f-incl').value)
@@ -304,7 +337,7 @@
 
     function runFilter() {
         pruneProducts();
-        const { limit, minPrice, minRating, minReviews, excl, incl } = getFilterValues();
+        const { limit, minPrice, minRating, maxRating, minReviews, excl, incl } = getFilterValues();
 
         clearSelected();
 
@@ -315,6 +348,7 @@
             let match = true;
             if (info.price < minPrice) match = false;
             if (match && minRating > 0 && info.rating < minRating) match = false;
+            if (match && maxRating > 0 && info.rating > maxRating) match = false;
             if (match && minReviews > 0 && info.reviews < minReviews) match = false;
             if (match && excl.length > 0 && excl.some(w => title.includes(w))) match = false;
             if (match && incl.length > 0 && !incl.every(w => title.includes(w))) match = false;
@@ -515,5 +549,12 @@
 
     let timer;
     new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(() => { pruneProducts(); scan(); }, 300); }).observe(document.body, { childList: true, subtree: true });
+    const hasUrlFilters = applyUrlFilters();
     scan();
+    if (hasUrlFilters) {
+        setTimeout(() => {
+            runFilter();
+            flash('已套用 Detail Page 篩選條件');
+        }, 700);
+    }
 })();

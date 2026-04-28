@@ -13,7 +13,7 @@
 - 每個分類最多顯示 10 個 ASIN。
 - 候選 ASIN 預設全部勾選；取消勾選後，複製時不會輸出該 ASIN。
 - 同一 ASIN 會自動去重；若出現在多個模組，會合併來源並提高排序。
-- 可使用 OpenAI API 產生 3 到 5 組 Core Keywords 與 Amazon Search 連結。
+- 可使用 OpenAI API 產生 3 組 Search Term Strategy 與 Amazon Search 連結。
 - 若未設定 OpenAI API key，或 API 呼叫失敗，會自動退回規則版 Core Keywords。
 - 支援在面板中手動編輯 Core Keywords，搜尋連結會即時更新。
 - 可複製 Markdown 格式的 Product Targeting 候選清單。
@@ -54,9 +54,15 @@
 
 來源語意不明或一般推薦模組中的 ASIN 會放在待確認。這些 ASIN 需要人工判斷是否同用途、互補或不相關。
 
-## Core Keywords 規則
+## Search Term Strategy 規則
 
-面板提供 OpenAI API key 與 model 欄位。儲存後，`Cmd/Ctrl + G` 會把目前商品資訊送到 OpenAI，要求回傳 3 到 5 組適合用來搜尋競品 ASIN 的 core keywords。
+面板提供 OpenAI API key 與 model 欄位。儲存後，`Cmd/Ctrl + G` 會把目前商品資訊送到 OpenAI，要求回傳 3 組適合用來搜尋 Product Targeting ASIN 的 search term strategy。
+
+三組策略為：
+
+- `Substitute`：找比目前產品弱、但仍有流量的直接替代競品。會傾向使用 `maxRating`、`minReviews`，必要時使用 `minPrice` 排除太低價雜訊。
+- `Complementary`：找不需要與目前產品比較、但情況優良的互補商品。會傾向使用 `minRating` 與 `minReviews`。
+- `Subject/IP`：如果產品有明確 subject、主題、角色、品牌 IP 或重點命名物件，會抓出一組相關 search term，並篩選情況優良的產品。
 
 送出的資料包含：
 
@@ -69,11 +75,16 @@
 
 OpenAI 回傳格式會被解析成：
 
-- keyword
+- type
+- search term
 - score
+- minReviews
+- minRating
+- maxRating
+- minPrice
 - reason
 
-若沒有設定 API key，或 OpenAI 呼叫失敗，腳本會使用內建規則產生 2 到 4 個字的 keyword candidates。
+若沒有設定 API key，或 OpenAI 呼叫失敗，腳本會使用內建規則產生這三組策略。
 
 加分來源：
 
@@ -92,14 +103,14 @@ OpenAI 回傳格式會被解析成：
 - 單字 keyword
 - 過長 keyword
 
-腳本不跨頁自動爬搜尋結果，高流量候選仍以 Core Keywords 的 Amazon Search links 呈現。
+腳本不跨頁自動爬搜尋結果，但 Search links 會帶上 `tm_*` 參數。Amazon Search 腳本會讀取這些參數並自動套用最低價格、最低評分、最高評分與最少評論數。
 
 ## 複製內容
 
 `Cmd/Ctrl + D` 會複製 Markdown，包含：
 
 - 主商品 ASIN、標題、URL
-- Core Keywords 與 Search links
+- Search Term Strategy 與 Search links
 - 已勾選的 Direct Competitors ASIN 與圖片 URL，最多 10 個
 - 已勾選的 Complementary Products ASIN 與圖片 URL，最多 10 個
 - 已勾選的 Need Review ASIN 與圖片 URL，最多 10 個

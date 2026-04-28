@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Amazon Detail - Product Targeting Panel
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.7
+// @version      2026.04.28.8
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -414,6 +414,32 @@
         return text || "";
     }
 
+    function parseNumber(value) {
+        const match = normalizeText(value).match(/(\d[\d,.]*)/);
+        return match ? parseFloat(match[1].replace(/,/g, "")) || 0 : 0;
+    }
+
+    function getProductPrice() {
+        return parseNumber(document.querySelector("#corePrice_feature_div .a-price .a-offscreen")?.textContent
+            || document.querySelector("#priceblock_ourprice")?.textContent
+            || document.querySelector("#priceblock_dealprice")?.textContent
+            || document.querySelector("#price_inside_buybox")?.textContent
+            || "");
+    }
+
+    function getProductRating() {
+        const text = normalizeText(document.querySelector("#acrPopover")?.getAttribute("title")
+            || document.querySelector("#acrPopover .a-icon-alt")?.textContent
+            || document.querySelector("[data-hook='rating-out-of-text']")?.textContent
+            || "");
+        const match = text.match(/(\d+(?:\.\d+)?)/);
+        return match ? parseFloat(match[1]) || 0 : 0;
+    }
+
+    function getProductReviews() {
+        return parseNumber(document.querySelector("#acrCustomerReviewText")?.textContent || "");
+    }
+
     function getRatingFromNode(node) {
         const text = normalizeText(node.querySelector(".a-icon-alt")?.textContent);
         const match = text.match(/(\d+(?:\.\d+)?)/);
@@ -530,6 +556,9 @@
             title: normalizeText(document.querySelector("#productTitle")?.textContent),
             brand: getBrand(),
             image: getBestImageUrl(document.querySelector("#landingImage") || document.querySelector("#imgTagWrapperId img")),
+            price: getProductPrice(),
+            rating: getProductRating(),
+            reviews: getProductReviews(),
             breadcrumbs: getBreadcrumbs(),
             bullets: getBullets(),
             bsrTexts: getBsrTexts(),
@@ -751,6 +780,50 @@
             .slice(0, CONFIG.MAX_KEYWORDS);
     }
 
+    function generateStrategyKeywords(product) {
+        const baseKeywords = generateKeywords(product);
+        const primary = baseKeywords[0]?.keyword || product.title || product.asin || "";
+        const category = product.breadcrumbs?.slice(-1)[0] || baseKeywords[1]?.keyword || primary;
+        const subject = product.brand && !/amazon/i.test(product.brand)
+            ? `${product.brand} ${primary}`.trim()
+            : category;
+        const currentRating = product.rating || 0;
+        const currentPrice = product.price || 0;
+
+        return [
+            {
+                type: "Substitute",
+                keyword: primary,
+                score: 90,
+                minReviews: product.reviews >= 200 ? 50 : 20,
+                minRating: null,
+                maxRating: currentRating ? Math.max(3.2, Math.round((currentRating - 0.1) * 10) / 10) : 4.2,
+                minPrice: currentPrice >= 10 ? Math.max(3, Math.round(currentPrice * 0.4)) : null,
+                sources: ["Rule fallback: weaker direct alternatives with traffic"]
+            },
+            {
+                type: "Complementary",
+                keyword: `${category} accessories`.replace(/\s+/g, " ").trim(),
+                score: 82,
+                minReviews: 30,
+                minRating: 4,
+                maxRating: null,
+                minPrice: null,
+                sources: ["Rule fallback: healthy related products"]
+            },
+            {
+                type: "Subject/IP",
+                keyword: subject,
+                score: 78,
+                minReviews: 30,
+                minRating: 4,
+                maxRating: null,
+                minPrice: null,
+                sources: ["Rule fallback: subject, brand, or theme products"]
+            }
+        ].filter((item) => item.keyword).slice(0, 3);
+    }
+
     function gmRequestJson(options) {
         return new Promise((resolve, reject) => {
             GM_xmlhttpRequest({
@@ -797,32 +870,42 @@
             .trim();
         const match = cleaned.match(/\{[\s\S]*\}/);
         const json = JSON.parse(match ? match[0] : cleaned);
-        const keywords = Array.isArray(json.keywords) ? json.keywords : [];
-        return keywords
+        const strategies = Array.isArray(json.strategies) ? json.strategies : Array.isArray(json.keywords) ? json.keywords : [];
+        return strategies
             .map((item, index) => ({
-                keyword: normalizeText(item.keyword || item),
+                type: normalizeText(item.type || item.intent || `Strategy ${index + 1}`),
+                keyword: normalizeText(item.searchTerm || item.keyword || item),
                 score: Number.isFinite(Number(item.score)) ? Number(item.score) : Math.max(100 - index * 8, 60),
-                sources: [normalizeText(item.reason || item.type || "OpenAI").replace(/\s+/g, " ") || "OpenAI"]
+                minReviews: Number.isFinite(Number(item.minReviews)) ? Number(item.minReviews) : null,
+                minRating: Number.isFinite(Number(item.minRating)) ? Number(item.minRating) : null,
+                maxRating: Number.isFinite(Number(item.maxRating)) ? Number(item.maxRating) : null,
+                minPrice: Number.isFinite(Number(item.minPrice)) ? Number(item.minPrice) : null,
+                sources: [normalizeText(item.reason || item.filterDirection || "OpenAI").replace(/\s+/g, " ") || "OpenAI"]
             }))
             .filter((item) => item.keyword)
-            .slice(0, CONFIG.MAX_KEYWORDS);
+            .slice(0, 3);
     }
 
     function buildOpenAiPrompt(product) {
         return [
-            "You generate Amazon Product Targeting research keywords.",
+            "You generate Amazon Product Targeting search term strategies.",
             "Return strict JSON only with this shape:",
-            "{\"keywords\":[{\"keyword\":\"2-4 word keyword\",\"score\":95,\"reason\":\"short reason\"}]}",
+            "{\"strategies\":[{\"type\":\"Substitute\",\"searchTerm\":\"2-5 word search term\",\"score\":95,\"minReviews\":50,\"minRating\":null,\"maxRating\":4.2,\"minPrice\":5,\"reason\":\"short reason\"}]}",
             "Rules:",
-            "- Generate 3 to 5 core keywords for finding competitor ASINs on Amazon Search.",
-            "- Prefer product noun phrases, not brand names.",
-            "- Avoid color, pack count, size, marketing words, and overly specific variants unless essential.",
-            "- Include category/use-case terms only when they help find relevant competing products.",
-            "- Keywords should be concise English phrases.",
+            "- Generate exactly 3 strategies: Substitute, Complementary, Subject/IP.",
+            "- Substitute: find weaker direct alternatives where shoppers may switch to this product. Prefer filters that capture worse-than-current products but still have traffic. Use maxRating when current rating is known. Use minReviews for traffic. Use minPrice only to avoid tiny irrelevant low-price items.",
+            "- Complementary: find healthy related products shoppers may buy before or with this product. Do not compare against current product; use minRating and minReviews for quality/traffic. minPrice is usually null unless needed to remove tiny accessories.",
+            "- Subject/IP: if the product has a clear subject, franchise, character, licensed IP, theme, or named object, generate one search term for that subject/IP. If none exists, use a strong category/theme term. Filter for healthy products with minRating and minReviews.",
+            "- Do not use maxPrice, include, exclude, or limit.",
+            "- If a filter is not appropriate, return null.",
+            "- Search terms should be concise English phrases.",
             "",
             `ASIN: ${product.asin || ""}`,
             `Title: ${product.title || ""}`,
             `Brand: ${product.brand || ""}`,
+            `Current Price: ${product.price || ""}`,
+            `Current Rating: ${product.rating || ""}`,
+            `Current Reviews: ${product.reviews || ""}`,
             `Breadcrumbs: ${(product.breadcrumbs || []).join(" > ")}`,
             `BSR/Category Text: ${(product.bsrTexts || []).join(" | ")}`,
             `Bullets: ${(product.bullets || []).slice(0, 5).join(" | ")}`,
@@ -851,8 +934,16 @@
         return keywords.length ? keywords : null;
     }
 
-    function searchUrl(keyword) {
-        return `https://www.amazon.com/s?k=${encodeURIComponent(keyword)}`;
+    function searchUrl(item) {
+        const strategy = typeof item === "string" ? { keyword: item } : item || {};
+        const params = new URLSearchParams();
+        params.set("k", strategy.keyword || "");
+        if (strategy.type) params.set("tm_intent", strategy.type.toLowerCase().replace(/[^a-z0-9]+/g, "_"));
+        if (strategy.minReviews !== null && strategy.minReviews !== undefined) params.set("tm_min_reviews", String(strategy.minReviews));
+        if (strategy.minRating !== null && strategy.minRating !== undefined) params.set("tm_min_rating", String(strategy.minRating));
+        if (strategy.maxRating !== null && strategy.maxRating !== undefined) params.set("tm_max_rating", String(strategy.maxRating));
+        if (strategy.minPrice !== null && strategy.minPrice !== undefined) params.set("tm_min_price", String(strategy.minPrice));
+        return `https://www.amazon.com/s?${params.toString()}`;
     }
 
     function asinUrl(asin) {
@@ -883,14 +974,25 @@
             .replace(/"/g, "&quot;");
     }
 
+    function filterSummary(item) {
+        const parts = [];
+        if (item.minReviews !== null && item.minReviews !== undefined) parts.push(`Reviews >= ${item.minReviews}`);
+        if (item.minRating !== null && item.minRating !== undefined) parts.push(`Rating >= ${item.minRating}`);
+        if (item.maxRating !== null && item.maxRating !== undefined) parts.push(`Rating <= ${item.maxRating}`);
+        if (item.minPrice !== null && item.minPrice !== undefined) parts.push(`Price >= $${item.minPrice}`);
+        return parts.join(" · ") || "No filters";
+    }
+
     function renderKeywords() {
-        if (state.keywords.length === 0) return `<div class="empty">No core keywords found on current page</div>`;
+        if (state.keywords.length === 0) return `<div class="empty">No search term strategies found on current page</div>`;
         return state.keywords.map((item, index) => `
             <div class="keyword-row" data-keyword-index="${index}">
+                <div class="score" style="margin-top:0;font-weight:800;">${escapeHtml(item.type || `Strategy ${index + 1}`)}</div>
                 <div class="keyword-top">
                     <input class="keyword-input" value="${escapeHtml(item.keyword)}" data-keyword-input="${index}">
-                    <a class="search-link" target="_blank" href="${searchUrl(item.keyword)}">Search</a>
+                    <a class="search-link" target="_blank" href="${searchUrl(item)}">Search</a>
                 </div>
+                <div class="score">${escapeHtml(filterSummary(item))}</div>
                 <div class="score">score ${item.score} · ${escapeHtml(item.sources.join(" + "))}</div>
             </div>
         `).join("");
@@ -947,7 +1049,7 @@
                 <div>${escapeHtml(product.title || "Title not found")}</div>
             </div>
             ${renderSettings()}
-            <h3>Core Keywords <span class="section-count">${state.keywords.length}/${CONFIG.MAX_KEYWORDS}</span></h3>
+            <h3>Search Term Strategy <span class="section-count">${state.keywords.length}/3</span></h3>
             ${renderKeywords()}
             ${renderCandidateSection(CATEGORY.DIRECT)}
             ${renderCandidateSection(CATEGORY.COMPLEMENTARY)}
@@ -955,7 +1057,7 @@
             <h3>High Traffic Research Links</h3>
             <div class="keyword-row">
                 ${(state.keywords.length ? state.keywords : [{ keyword: product.title || product.asin || "" }]).slice(0, 3).map((item) => `
-                    <div><a class="search-link" target="_blank" href="${searchUrl(item.keyword)}">${escapeHtml(item.keyword || "Search current product")}</a></div>
+                    <div><a class="search-link" target="_blank" href="${searchUrl(item)}">${escapeHtml(item.keyword || "Search current product")}</a></div>
                 `).join("")}
             </div>
             <div class="hint">
@@ -970,7 +1072,7 @@
                 if (!state.keywords[index]) return;
                 state.keywords[index].keyword = nextValue;
                 const link = input.closest(".keyword-row")?.querySelector(".search-link");
-                if (link) link.href = searchUrl(nextValue);
+                if (link) link.href = searchUrl(state.keywords[index]);
             });
         });
 
@@ -1017,7 +1119,7 @@
         state.product = getProductInfo();
         state.candidates = collectCandidates(state.product.asin);
         setDefaultSelection();
-        state.keywords = generateKeywords(state.product);
+        state.keywords = generateStrategyKeywords(state.product);
         state.keywordMode = "rule fallback";
         renderPanel();
         setPanelVisible(true);
@@ -1060,8 +1162,8 @@
     function buildMarkdown() {
         const product = state.product || getProductInfo();
         const keywordLines = state.keywords.length
-            ? state.keywords.map((item) => `- ${item.keyword} (score ${item.score}, ${item.sources.join(" + ")})\n  ${searchUrl(item.keyword)}`).join("\n")
-            : "No core keywords found on current page";
+            ? state.keywords.map((item) => `- ${item.type || "Strategy"}: ${item.keyword} (${filterSummary(item)}; score ${item.score})\n  ${searchUrl(item)}\n  Reason: ${item.sources.join(" + ")}`).join("\n")
+            : "No search term strategies found on current page";
 
         return [
             `# Product Targeting Candidates for ${product.asin || "Unknown ASIN"}`,
@@ -1069,7 +1171,7 @@
             `Title: ${product.title || "Title not found"}`,
             `URL: ${product.url || location.href}`,
             "",
-            "## Core Keywords",
+            "## Search Term Strategy",
             keywordLines,
             "",
             "## Direct Competitors",
@@ -1083,7 +1185,7 @@
             "",
             "## High Traffic Research Links",
             state.keywords.length
-                ? state.keywords.slice(0, 3).map((item) => `- ${item.keyword}: ${searchUrl(item.keyword)}`).join("\n")
+                ? state.keywords.slice(0, 3).map((item) => `- ${item.type || "Strategy"} - ${item.keyword}: ${searchUrl(item)}`).join("\n")
                 : `- Search current product: ${searchUrl(product.title || product.asin || "")}`
         ].join("\n");
     }
