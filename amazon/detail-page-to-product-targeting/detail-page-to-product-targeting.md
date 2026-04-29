@@ -72,6 +72,7 @@
 - Breadcrumb / 類目
 - BSR / 類目文字
 - 變體資訊
+- 頁面上目前已載入的 customer review 文字摘要
 
 OpenAI 回傳格式會被解析成：
 
@@ -111,7 +112,7 @@ OpenAI 不需要回傳篩選欄位；`minReviews`、`minRating`、`maxRating`、
 - `product_page_text`
 - `product_image`
 - `search_term_report`
-- 也可額外提供 `title`、`brand`、`price`、`rating`、`reviews`、`breadcrumbs`、`bullets`、`bsrTexts`、`variationText`
+- 也可額外提供 `title`、`brand`、`price`、`rating`、`reviews`、`breadcrumbs`、`bullets`、`bsrTexts`、`variationText`、`customer_reviews`
 
 若有設定 OpenAI API key，手動資料會連同 `product_image` 與 `search_term_report` 一起送出；若沒有 API key，會優先用 `search_term_report` 的前三個詞產生三組策略。
 

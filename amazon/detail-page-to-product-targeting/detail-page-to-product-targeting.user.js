@@ -566,6 +566,28 @@
             .join(" ");
     }
 
+    function getCustomerReviewTexts() {
+        const selectors = [
+            "#cm-cr-dp-review-list [data-hook='review'] [data-hook='review-body'] span",
+            "#cm-cr-dp-review-list [data-hook='review'] [data-hook='review-body']",
+            "#reviews-medley-footer ~ div [data-hook='review-body'] span",
+            "#reviews-medley-footer ~ div [data-hook='review-body']"
+        ];
+        const seen = new Set();
+        const snippets = [];
+
+        selectors.forEach((selector) => {
+            document.querySelectorAll(selector).forEach((el) => {
+                const text = normalizeText(el.textContent);
+                if (!text || text.length < 20 || seen.has(text)) return;
+                seen.add(text);
+                snippets.push(text);
+            });
+        });
+
+        return snippets.slice(0, 6);
+    }
+
     function getProductInfo() {
         return {
             asin: getCurrentAsin(),
@@ -578,6 +600,7 @@
             breadcrumbs: getBreadcrumbs(),
             bullets: getBullets(),
             bsrTexts: getBsrTexts(),
+            customerReviews: getCustomerReviewTexts(),
             variationText: getVariationText(),
             url: location.href.split("#")[0]
         };
@@ -606,6 +629,7 @@
             breadcrumbs: normalizeStringArray(raw.breadcrumbs || raw.category || raw.categories),
             bullets: normalizeStringArray(raw.bullets || raw.bullet_points || raw.product_bullets),
             bsrTexts: normalizeStringArray(raw.bsrTexts || raw.bsr_texts || raw.bsr),
+            customerReviews: normalizeStringArray(raw.customer_reviews || raw.customerReviews || raw.review_texts || raw.reviewTexts),
             variationText: normalizeText(raw.variationText || raw.variation_text || ""),
             url: normalizeText(raw.url || raw.product_url || location.href.split("#")[0]),
             purpose: normalizeText(raw.purpose || ""),
@@ -821,6 +845,7 @@
         product.breadcrumbs.forEach((text) => addNgrams(map, text, "category", 8, brandTokens));
         product.bsrTexts.forEach((text) => addNgrams(map, text, "category", 8, brandTokens));
         product.bullets.slice(0, 5).forEach((text) => addNgrams(map, text, "bullet", 4, brandTokens));
+        product.customerReviews.slice(0, 4).forEach((text) => addNgrams(map, text, "review", 3, brandTokens));
         addNgrams(map, product.variationText, "variation", 2, brandTokens);
 
         const titleTokens = tokenize(product.title).filter((token) => !isNoiseToken(token, brandTokens));
@@ -1002,6 +1027,7 @@
             `Breadcrumbs: ${(product.breadcrumbs || []).join(" > ")}`,
             `BSR/Category Text: ${(product.bsrTexts || []).join(" | ")}`,
             `Bullets: ${(product.bullets || []).slice(0, 5).join(" | ")}`,
+            `Customer Review Snippets: ${(product.customerReviews || []).slice(0, 4).join(" | ")}`,
             `Variation Text: ${product.variationText || ""}`
         ].join("\n");
     }
