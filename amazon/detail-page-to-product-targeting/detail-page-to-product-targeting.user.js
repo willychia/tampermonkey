@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Amazon - Detail Page to Product Targeting
 // @namespace    https://willy-toolbox.example
-// @version      2026.04.28.19
+// @version      2026.04.29.01
 // @description  在 Amazon 商品頁整理 Product Targeting 候選 ASIN、圖片、勾選清單與 OpenAI Core Keywords。
 // @author       Willy Chia
 // @match        https://www.amazon.com/dp/*
@@ -27,6 +27,7 @@
         PANEL_ID: "amz-detail-pt-panel",
         RESCUE_ID: "amz-detail-pt-rescue",
         STORAGE_KEY: "amz-detail-product-targeting-v1",
+        MANUAL_INPUT_KEY: "manualProductInput",
         THEME_COLOR: "#e47911",
         BAR_BG: "#232f3e"
     };
@@ -123,6 +124,8 @@
             [CATEGORY.COMPLEMENTARY]: new Set(),
             [CATEGORY.REVIEW]: new Set()
         },
+        manualProductInput: "",
+        productSource: "page",
         isVisible: true,
         flashTimer: null
     };
@@ -148,6 +151,18 @@
             min-width: 0; border: 1px solid #ddd; border-radius: 5px; padding: 5px 6px; font-size: 12px;
         }
         #${CONFIG.PANEL_ID} .settings-actions { display: flex; gap: 6px; margin-bottom: 10px; }
+        #${CONFIG.PANEL_ID} .manual-product-box {
+            border: 1px solid #e5e5e5; border-radius: 8px; padding: 8px; margin: 10px 0; background: #fff;
+        }
+        #${CONFIG.PANEL_ID} .manual-product-header {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;
+            font-size: 12px; font-weight: 800;
+        }
+        #${CONFIG.PANEL_ID} .manual-product-input {
+            width: 100%; min-height: 92px; box-sizing: border-box; resize: vertical;
+            border: 1px solid #ddd; border-radius: 6px; padding: 6px; font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+        }
+        #${CONFIG.PANEL_ID} .manual-product-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
         #${CONFIG.PANEL_ID} .mini-btn {
             border: 1px solid #ddd; background: #fff; border-radius: 5px; padding: 5px 7px;
             cursor: pointer; font-weight: 700; font-size: 11px; color: #333;
@@ -253,6 +268,7 @@
 
     const settings = loadSettings();
     state.isVisible = settings.isVisible !== false;
+    state.manualProductInput = settings[CONFIG.MANUAL_INPUT_KEY] || "";
 
     const panel = document.createElement("div");
     panel.id = CONFIG.PANEL_ID;
@@ -567,6 +583,53 @@
         };
     }
 
+    function normalizeStringArray(value) {
+        if (Array.isArray(value)) return value.map(normalizeText).filter(Boolean);
+        if (typeof value === "string") {
+            return value.split(/\r?\n|,/).map(normalizeText).filter(Boolean);
+        }
+        return [];
+    }
+
+    function normalizeManualProduct(raw) {
+        const productPageText = normalizeText(raw.product_page_text || raw.productPageText || raw.pageText || "");
+        const title = normalizeText(raw.title || raw.product_title || raw.productTitle || productPageText);
+        const asin = normalizeText(raw.asin).toUpperCase();
+        return {
+            asin,
+            title,
+            brand: normalizeText(raw.brand || raw.product_brand || raw.productBrand || ""),
+            image: normalizeText(raw.product_image || raw.productImage || raw.image || ""),
+            price: Number(raw.price || raw.product_price || raw.productPrice) || 0,
+            rating: Number(raw.rating || raw.product_rating || raw.productRating) || 0,
+            reviews: Number(raw.reviews || raw.product_reviews || raw.productReviews) || 0,
+            breadcrumbs: normalizeStringArray(raw.breadcrumbs || raw.category || raw.categories),
+            bullets: normalizeStringArray(raw.bullets || raw.bullet_points || raw.product_bullets),
+            bsrTexts: normalizeStringArray(raw.bsrTexts || raw.bsr_texts || raw.bsr),
+            variationText: normalizeText(raw.variationText || raw.variation_text || ""),
+            url: normalizeText(raw.url || raw.product_url || location.href.split("#")[0]),
+            purpose: normalizeText(raw.purpose || ""),
+            productPageText,
+            searchTermReport: normalizeStringArray(raw.search_term_report || raw.searchTermReport || raw.searchTerms)
+        };
+    }
+
+    function parseManualProductInput(value) {
+        const text = normalizeText(value);
+        if (!text) throw new Error("請先貼上產品資訊 JSON");
+        let raw = null;
+        try {
+            raw = JSON.parse(text);
+        } catch (err) {
+            throw new Error(`JSON 格式錯誤：${err.message}`);
+        }
+        const product = normalizeManualProduct(raw);
+        if (!product.asin && !product.title && !product.productPageText) {
+            throw new Error("JSON 至少需要 asin、title 或 product_page_text");
+        }
+        return product;
+    }
+
     function getModuleName(module) {
         const id = module.id ? module.id.replace(/_/g, " ") : "";
         const attr = module.getAttribute("data-feature-name") || module.getAttribute("cel_widget_id") || "";
@@ -781,6 +844,17 @@
     }
 
     function generateStrategyKeywords(product) {
+        if (product.searchTermReport?.length) {
+            const uniqueTerms = [...new Set(product.searchTermReport.map(normalizeText).filter(Boolean))];
+            const types = ["Substitute", "Complementary", "Subject/IP"];
+            return uniqueTerms.slice(0, 3).map((term, index) => enforceStrategyFilters({
+                type: types[index],
+                keyword: term,
+                score: 88 - index * 4,
+                sources: ["Manual search term report"]
+            }, product));
+        }
+
         const baseKeywords = generateKeywords(product);
         const primary = baseKeywords[0]?.keyword || product.title || product.asin || "";
         const category = product.breadcrumbs?.slice(-1)[0] || baseKeywords[1]?.keyword || primary;
@@ -922,6 +996,9 @@
             `Current Rating: ${product.rating || ""}`,
             `Current Reviews: ${product.reviews || ""}`,
             `Main Image URL: ${product.image || ""}`,
+            `Purpose: ${product.purpose || ""}`,
+            `Product Page Text: ${product.productPageText || ""}`,
+            `Search Term Report: ${(product.searchTermReport || []).join(" | ")}`,
             `Breadcrumbs: ${(product.breadcrumbs || []).join(" > ")}`,
             `BSR/Category Text: ${(product.bsrTexts || []).join(" | ")}`,
             `Bullets: ${(product.bullets || []).slice(0, 5).join(" | ")}`,
@@ -1070,6 +1147,25 @@
         `;
     }
 
+    function renderManualProductInput() {
+        const sourceText = state.productSource === "manual" ? "Manual product active" : "Using current page";
+        const placeholder = '{"asin":"B09X2RX2VY","purpose":"positive","product_page_text":"Julia Buxton Heiress Double Cardex Red...","product_image":"https://m.media-amazon.com/images/I/81R9tfXiMVL.jpg","search_term_report":["buxton wallet","julia buxton wallet"]}';
+        return `
+            <div class="manual-product-box">
+                <div class="manual-product-header">
+                    <span>Manual Product Info</span>
+                    <span class="score">${escapeHtml(sourceText)}</span>
+                </div>
+                <textarea id="amz-detail-manual-product" class="manual-product-input" placeholder="${escapeHtml(placeholder)}">${escapeHtml(state.manualProductInput)}</textarea>
+                <div class="manual-product-actions">
+                    <button class="mini-btn" id="amz-detail-apply-manual-product" type="button">Apply Product Info</button>
+                    <button class="mini-btn" id="amz-detail-use-page-product" type="button">Use Current Page</button>
+                    <button class="mini-btn" id="amz-detail-clear-manual-product" type="button">Clear</button>
+                </div>
+            </div>
+        `;
+    }
+
     function renderCandidate(candidate, category) {
         const checked = isCandidateSelected(category, candidate.asin) ? "checked" : "";
         return `
@@ -1110,6 +1206,7 @@
                 <div>${escapeHtml(product.title || "Title not found")}</div>
                 <div class="score">${escapeHtml(productMeta)}</div>
             </div>
+            ${renderManualProductInput()}
             ${renderSettings()}
             <h3>Search Term Strategy <span class="section-count">${state.keywords.length}/3</span></h3>
             ${renderKeywords()}
@@ -1147,6 +1244,26 @@
             renderPanel();
         });
 
+        body.querySelector("#amz-detail-manual-product")?.addEventListener("input", (e) => {
+            state.manualProductInput = e.target.value;
+            saveSettings({ [CONFIG.MANUAL_INPUT_KEY]: state.manualProductInput });
+        });
+
+        body.querySelector("#amz-detail-apply-manual-product")?.addEventListener("click", () => {
+            applyManualProduct();
+        });
+
+        body.querySelector("#amz-detail-use-page-product")?.addEventListener("click", () => {
+            scanPage();
+        });
+
+        body.querySelector("#amz-detail-clear-manual-product")?.addEventListener("click", () => {
+            state.manualProductInput = "";
+            saveSettings({ [CONFIG.MANUAL_INPUT_KEY]: "" });
+            renderPanel();
+            flash("手動產品資訊已清空");
+        });
+
         body.querySelectorAll("[data-candidate-asin]").forEach((input) => {
             input.addEventListener("change", () => {
                 const category = input.getAttribute("data-candidate-category");
@@ -1170,8 +1287,56 @@
         });
     }
 
+    async function applyManualProduct() {
+        const input = panel.querySelector("#amz-detail-manual-product");
+        state.manualProductInput = input?.value || state.manualProductInput;
+        saveSettings({ [CONFIG.MANUAL_INPUT_KEY]: state.manualProductInput });
+
+        let product = null;
+        try {
+            product = parseManualProductInput(state.manualProductInput);
+        } catch (err) {
+            flash(err.message);
+            return;
+        }
+
+        state.product = product;
+        state.productSource = "manual";
+        state.candidates = {
+            [CATEGORY.DIRECT]: [],
+            [CATEGORY.COMPLEMENTARY]: [],
+            [CATEGORY.REVIEW]: []
+        };
+        setDefaultSelection();
+        state.keywords = generateStrategyKeywords(state.product);
+        state.keywordMode = product.searchTermReport?.length ? "manual report" : "rule fallback";
+        renderPanel();
+        setPanelVisible(true);
+
+        if (getApiKey()) {
+            flash("正在用 OpenAI 產生手動產品 Search Terms...");
+            try {
+                const aiKeywords = await generateOpenAiKeywords(state.product);
+                if (aiKeywords) {
+                    state.keywords = aiKeywords;
+                    state.keywordMode = "OpenAI";
+                    renderPanel();
+                }
+            } catch (err) {
+                console.warn("OpenAI keyword generation failed for manual product", err);
+                state.keywordMode = product.searchTermReport?.length ? "manual report" : "rule fallback";
+                renderPanel();
+                flash(`OpenAI 失敗，已保留手動資料：${err.message}`);
+                return;
+            }
+        }
+
+        flash(`已套用手動產品資訊：${state.product.asin || "No ASIN"}，Keywords: ${state.keywordMode}`);
+    }
+
     async function scanPage() {
         state.product = getProductInfo();
+        state.productSource = "page";
         state.candidates = collectCandidates(state.product.asin);
         setDefaultSelection();
         state.keywords = generateStrategyKeywords(state.product);

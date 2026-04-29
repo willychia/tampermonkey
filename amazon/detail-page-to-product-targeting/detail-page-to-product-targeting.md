@@ -13,6 +13,7 @@
 - `互補品` 預設勾選，`直接競品` 預設不勾選；取消勾選後，複製時不會輸出該 ASIN。
 - 同一 ASIN 會自動去重；若出現在多個模組，會合併來源並提高排序。
 - 可使用 OpenAI API 產生 3 組 Search Term Strategy 與 Amazon Search 連結。
+- 可在面板手動貼上產品資訊 JSON，不必完全依賴目前 Detail Page 的 DOM 資料。
 - 若未設定 OpenAI API key，或 API 呼叫失敗，會自動退回規則版 Core Keywords。
 - 支援在面板中手動編輯 Core Keywords，搜尋連結會即時更新。
 - 可複製已勾選的 ASIN 清單。
@@ -82,6 +83,37 @@ OpenAI 回傳格式會被解析成：
 OpenAI 不需要回傳篩選欄位；`minReviews`、`minRating`、`maxRating`、`minPrice` 會由腳本依策略類型硬套。
 
 若沒有設定 API key，或 OpenAI 呼叫失敗，腳本會使用內建規則產生這三組策略。
+
+## 手動產品資訊
+
+面板中的 `Manual Product Info` 可貼上 JSON 後按 `Apply Product Info`，腳本會改用這份資料產生 Search Term Strategy。按 `Use Current Page` 會回到掃描目前 Amazon Detail Page。
+
+輸入範例：
+
+```json
+{
+  "asin": "B09X2RX2VY",
+  "purpose": "positive",
+  "product_page_text": "Julia Buxton Heiress Double Cardex™ Red, None, Julia Buxton USA, Charming Charlie, Red, Modern, WALLET, JYS Enterprise, 39388.RD",
+  "product_image": "https://m.media-amazon.com/images/I/81R9tfXiMVL.jpg",
+  "search_term_report": [
+    "buxton rfid wallets for women",
+    "buxton wallet",
+    "buxton wallet for women"
+  ]
+}
+```
+
+支援欄位：
+
+- `asin`
+- `purpose`
+- `product_page_text`
+- `product_image`
+- `search_term_report`
+- 也可額外提供 `title`、`brand`、`price`、`rating`、`reviews`、`breadcrumbs`、`bullets`、`bsrTexts`、`variationText`
+
+若有設定 OpenAI API key，手動資料會連同 `product_image` 與 `search_term_report` 一起送出；若沒有 API key，會優先用 `search_term_report` 的前三個詞產生三組策略。
 
 加分來源：
 
