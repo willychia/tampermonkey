@@ -1435,11 +1435,23 @@
         return [...new Set(ordered.map((item) => item.asin))];
     }
 
+    async function readClipboardText() {
+        if (!navigator.clipboard?.readText) return "";
+        try {
+            return await navigator.clipboard.readText();
+        } catch (err) {
+            console.warn("Clipboard read failed", err);
+            return "";
+        }
+    }
+
     async function copySelectedAsins() {
         if (!state.product) await scanPage();
         const asins = getSelectedAsinsForCopy();
-        GM_setClipboard(asins.join("\n"));
-        flash(`已複製 ${asins.length} 個已勾選 ASIN`);
+        const existingText = await readClipboardText();
+        const nextText = [existingText.trimEnd(), asins.join("\n")].filter(Boolean).join("\n");
+        GM_setClipboard(nextText);
+        flash(`已附加 ${asins.length} 個已勾選 ASIN`);
     }
 
     panel.querySelector("#amz-detail-pt-hide").addEventListener("click", () => {

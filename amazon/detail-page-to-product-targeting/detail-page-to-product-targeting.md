@@ -21,7 +21,7 @@
 ## 快捷鍵
 
 - `Cmd/Ctrl + G`：重新掃描目前 Detail Page 並更新面板。
-- `Cmd/Ctrl + D`：複製已勾選的 ASIN，一行一個。
+- `Cmd/Ctrl + D`：把已勾選的 ASIN 追加到目前剪貼簿內容後方，一行一個。
 - `Cmd/Ctrl + B`：顯示或隱藏面板。
 - `Cmd/Ctrl + 1`：開啟 `Substitute` search term 連結。
 - `Cmd/Ctrl + 2`：開啟 `Complementary` search term 連結。
@@ -137,7 +137,7 @@ OpenAI 不需要回傳篩選欄位；`minReviews`、`minRating`、`maxRating`、
 
 ## 複製內容
 
-`Cmd/Ctrl + D` 會複製已勾選的 ASIN，一行一個：
+`Cmd/Ctrl + D` 會把已勾選的 ASIN 追加到目前剪貼簿內容後方，一行一個：
 
 - Complementary Products 中已勾選的 ASIN
 - Direct Competitors 中已勾選的 ASIN
