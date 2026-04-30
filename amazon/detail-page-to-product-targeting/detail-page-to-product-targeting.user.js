@@ -977,11 +977,12 @@
 
     function enforceSubstituteFilters(item, product) {
         if (!item || !isSubstituteStrategy(item)) return item;
+        const hasProductRating = Number(product.rating) > 0;
         return {
             ...item,
             minReviews: null,
             minRating: null,
-            maxRating: Math.max(product.rating || 0, 3),
+            maxRating: hasProductRating ? Math.max(product.rating, 3) : null,
             minPrice: product.price || null
         };
     }
@@ -1008,7 +1009,7 @@
             "{\"strategies\":[{\"type\":\"Substitute\",\"searchTerm\":\"2-5 word search term\",\"score\":95,\"reason\":\"short reason\"}]}",
             "Rules:",
             "- Generate exactly 3 strategies: Substitute, Complementary, Subject/IP.",
-            "- Substitute: find direct alternatives where shoppers may switch to this product. The script will hard-code Substitute filters after your response: minPrice equals the current product price, maxRating equals max(current rating, 3), minReviews is null, and minRating is null. Focus on the best Substitute search term.",
+            "- Substitute: find direct alternatives where shoppers may switch to this product. The script will hard-code Substitute filters after your response: minPrice equals the current product price, maxRating equals max(current rating, 3) only when the current product has a rating, minReviews is null, and minRating is null. Focus on the best Substitute search term.",
             "- Complementary: find healthy related products shoppers may buy before or with this product. The script will hard-code Complementary filters after your response: minRating 4, minReviews 50, minPrice null, maxRating null. Focus on the best Complementary search term.",
             "- Subject/IP: if the product has a clear subject, franchise, character, licensed IP, theme, or named object, generate one search term for that subject/IP. If none exists, use a strong category/theme term. The script will hard-code Subject/IP filters after your response: minRating 4, minReviews 50, minPrice null, maxRating null.",
             "- Do not return filter fields such as minReviews, minRating, maxRating, minPrice, maxPrice, include, exclude, or limit.",
