@@ -12,6 +12,8 @@
   Product Targeting 後台工具，支援批次勾選、ASIN 篩選與 Bid 調整。
 - `admin/keyword-targeting-page/keyword-targeting-page.user.js`
   Keyword Targeting 後台工具，支援批次勾選、長尾字詞篩選與 Bid 調整。
+- `admin/target-page/target-page.user.js`
+  Target Page 後台工具，支援合併後 Target 頁面的批次勾選、欄位篩選與 Bid 調整。
 - `admin/ad-group-page/ad-group-page.user.js`
   Ad Group 後台工具，支援批次勾選、快速開啟與排序後保留捲動位置。
 - `admin/shared/tabulator-page-utils.js`
@@ -27,6 +29,8 @@
   Product Targeting 頁面腳本
 - `admin/keyword-targeting-page/keyword-targeting-page.md`
   Keyword Targeting 頁面腳本
+- `admin/target-page/target-page.md`
+  Target Page 頁面腳本
 - `admin/ad-group-page/ad-group-page.md`
   Ad Group 頁面腳本
 
@@ -36,13 +40,14 @@
 - [Amazon Search](https://raw.githubusercontent.com/willychia/tampermonkey/main/amazon/search-result-filter/search-result-filter.user.js)
 - [Product Targeting](https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/product-targeting-page/product-targeting-page.user.js)
 - [Keyword Targeting](https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/keyword-targeting-page/keyword-targeting-page.user.js)
+- [Target Page](https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/target-page/target-page.user.js)
 - [Ad Group](https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/ad-group-page/ad-group-page.user.js)
 
 ## 維護注意事項
 
 - 每個頁面腳本都直接維護在對應的 `.user.js` 檔案中。
 - 安裝與更新請使用上方 `.user.js` 連結，Tampermonkey 才會辨識為可安裝的 userscript。
-- Product Targeting 與 Keyword Targeting 會透過 Tampermonkey `@require` 共用 `admin/shared/tabulator-page-utils.js`。
+- Product Targeting、Keyword Targeting 與 Target Page 會透過 Tampermonkey `@require` 共用 `admin/shared/tabulator-page-utils.js`。
 - Hourloop 後台頁面依賴 Tabulator table，因此相關腳本會讀取頁面上的 Tabulator instance。
 - 各頁面的說明文件放在腳本旁邊。
 - 版本號採用日期格式，方便追蹤每次發布。
