@@ -295,7 +295,7 @@
     }
 
     // Cmd/Ctrl + D 會找出 ACOS 偏高且 bid 可下修的 target，
-    // 直接填入計算後的新 bid，並逐筆送出儲存。
+    // 直接填入計算後的新 bid，但不自動送出儲存。
     async function smartConditionSelectAndPrepareBidReduction() {
         table = getTable();
         if (!table) return;
@@ -326,24 +326,22 @@
         await sortByCheckBox();
         scrollFirstSelectedToTop();
 
-        let savedCount = 0;
+        let preparedCount = 0;
         for (const { row, targetBid } of targetRows) {
             const rowEl = row.getElement();
             const bidInput = rowEl?.querySelector('input[name="bid_fixed_value"]');
-            const saveBtn = rowEl?.querySelector('button.save-bid-button[type="submit"]');
 
-            if (!bidInput || !saveBtn) continue;
+            if (!bidInput) continue;
 
             bidInput.value = targetBid.toFixed(2);
             bidInput.dispatchEvent(new Event("input", { bubbles: true }));
             bidInput.dispatchEvent(new Event("change", { bubbles: true }));
             bidInput.style.backgroundColor = "#fff3cd";
-            saveBtn.click();
-            savedCount++;
+            preparedCount++;
             await utils.wait(200);
         }
 
-        console.log(`已完成 ${savedCount} 筆高 ACOS Target 的自動降價`);
+        console.log(`已完成 ${preparedCount} 筆高 ACOS Target 降價準備，未自動儲存`);
     }
 
     // -----------------------------
