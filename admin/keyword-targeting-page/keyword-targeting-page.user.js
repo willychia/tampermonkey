@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Admin - Keyword Targeting Page
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.28.1
-// @description  Cmd+A 自動加價儲存，Cmd+D 依 ACOS 預填降價 Bid
+// @version      2026.05.04.1
+// @description  Cmd+A 自動加價儲存，Cmd+D 依 ACOS 預填降價 Bid 但不自動儲存
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/keyword-targeting-page/keyword-targeting-page.user.js

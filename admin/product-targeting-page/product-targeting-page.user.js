@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Admin - Product Targeting Page
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.28.1
-// @description  Product Targeting 加強版：Cmd+A 自動調價、Cmd+D 預填降價、ASIN 批次勾選、UI 優化
+// @version      2026.05.04.1
+// @description  Product Targeting 加強版：Cmd+A 自動調價、Cmd+D 預填降價但不自動儲存、ASIN 批次勾選、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/product_targets?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/product-targeting-page/product-targeting-page.user.js

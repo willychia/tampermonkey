@@ -2,7 +2,7 @@
 // @name         Ads Team Toolbox - Admin - Target Page
 // @namespace    http://tampermonkey.net/
 // @version      2026.05.04.1
-// @description  Target Page 加強版：Cmd+A 自動調價、Cmd+D 依 ACOS 預填降價 Bid、UI 優化
+// @description  Target Page 加強版：Cmd+A 自動調價、Cmd+D 依 ACOS 預填降價 Bid 但不自動儲存、UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/targets?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/target-page/target-page.user.js
