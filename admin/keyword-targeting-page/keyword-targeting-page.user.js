@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Admin - Keyword Targeting Page
 // @namespace    http://tampermonkey.net/
-// @version      2026.05.04.1
-// @description  Cmd+A 自動加價儲存，Cmd+D 依 ACOS 預填降價 Bid 但不自動儲存
+// @version      2026.05.05.1
+// @description  Keyword Targeting 加強版：長尾關鍵字勾選、批次選取、匯出與 UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*
 // @updateURL    https://raw.githubusercontent.com/willychia/tampermonkey/main/admin/keyword-targeting-page/keyword-targeting-page.user.js
@@ -146,7 +146,7 @@
     // 鍵盤快捷鍵
     // -----------------------------
     // 這一段統一攔截本頁最常用的快捷鍵，
-    // 包含自動調價、長尾關鍵字勾選、匯出與表頭選單操作。
+    // 包含長尾關鍵字勾選、匯出與表頭選單操作。
     function bindKeyboardOnce() {
         if (keydownBound) return;
         keydownBound = true;
@@ -168,14 +168,6 @@
 
             // 將常用的批次操作綁到鍵盤，減少反覆滑鼠操作。
             switch (key) {
-                case "a":
-                    e.preventDefault();
-                    smartConditionSelectAndAdjustBid();
-                    break;
-                case "d":
-                    e.preventDefault();
-                    smartConditionSelectAndPrepareBidReduction();
-                    break;
                 case "arrowup":
                     e.preventDefault();
                     moveSelection(-1);
@@ -222,125 +214,6 @@
     }
 
     // -----------------------------
-    // 自動調價流程
-    // -----------------------------
-    // Cmd/Ctrl + A 會依商業條件篩選出值得調價的關鍵字，
-    // 接著逐列改寫 bid、觸發前端事件並送出儲存。
-    async function smartConditionSelectAndAdjustBid() {
-        table = getTable();
-        if (!table) return;
-
-        table.deselectRow();
-        const activeRows = table.getRows("active");
-        const targetRows = [];
-
-        activeRows.forEach((row) => {
-            const data = row.getData();
-            const daysOfSupply = parseFloat(data.days_of_supply) || 0;
-            const acos = parseFloat(data.acos) || 0;
-            const unitsSold = parseInt(data.units_sold_same_sku, 10) || 0;
-            const bidVal = parseFloat(parseFloat(data.bid || 0).toFixed(2));
-            const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
-
-            const isGoodPerformance =
-                daysOfSupply > 7 &&
-                acos <= 0.1 &&
-                unitsSold > 0 &&
-                bidVal < 1 &&
-                bidVal < cpcVal;
-
-            // 只挑出庫存健康、表現不差且 bid 仍有上調空間的列。
-            if (isGoodPerformance) {
-                row.select();
-                targetRows.push(row);
-            }
-        });
-
-        if (targetRows.length === 0) {
-            console.log("沒有符合條件（含銷量 > 0）的關鍵字");
-            utils.showAlert("No keyword rows matched the Cmd/Ctrl + A conditions.");
-            return;
-        }
-
-        await sortByCheckBox();
-        scrollFirstSelectedToTop();
-
-        let processedCount = 0;
-        for (const row of targetRows) {
-            const data = row.getData();
-            const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
-            const newBid = Math.min(1, cpcVal).toFixed(2);
-
-            const rowEl = row.getElement();
-            const bidInput = rowEl?.querySelector('input[name="bid_fixed_value"]');
-            const saveBtn = rowEl?.querySelector('button.save-bid-button[type="submit"]');
-
-            if (!bidInput || !saveBtn) continue;
-
-            // 手動觸發 input/change，確保頁面框架能正確感知 bid 已被修改。
-            bidInput.value = newBid;
-            bidInput.dispatchEvent(new Event("input", { bubbles: true }));
-            bidInput.dispatchEvent(new Event("change", { bubbles: true }));
-            bidInput.style.backgroundColor = "#c8e6c9";
-            saveBtn.click();
-            processedCount++;
-            await utils.wait(200);
-        }
-
-        console.log(`✅ 已完成 ${processedCount} 筆含銷量關鍵字的自動優化`);
-    }
-
-    // Cmd/Ctrl + D 會找出 ACOS 過高且 bid 高於目標值的列，
-    // 直接把 bid 更新為計算後的 target bid，但不自動送出儲存。
-    async function smartConditionSelectAndPrepareBidReduction() {
-        table = getTable();
-        if (!table) return;
-
-        table.deselectRow();
-        const activeRows = table.getRows("active");
-        const targetRows = [];
-
-        activeRows.forEach((row) => {
-            const data = row.getData();
-            const acos = parseFloat(data.acos) || 0;
-            const bidVal = parseFloat(parseFloat(data.bid || 0).toFixed(2));
-            const cpcVal = parseFloat(parseFloat(data.cpc || 0).toFixed(2));
-            const targetBid = calculateHighAcosTargetBid({ acos, bidVal, cpcVal });
-
-            if (acos > 0.2 && Number.isFinite(targetBid) && bidVal > targetBid) {
-                row.select();
-                targetRows.push({ row, targetBid });
-            }
-        });
-
-        if (targetRows.length === 0) {
-            console.log("沒有符合 Cmd/Ctrl + D 降價條件的關鍵字");
-            utils.showAlert("No keyword rows matched the Cmd/Ctrl + D conditions.");
-            return;
-        }
-
-        await sortByCheckBox();
-        scrollFirstSelectedToTop();
-
-        let preparedCount = 0;
-        for (const { row, targetBid } of targetRows) {
-            const rowEl = row.getElement();
-            const bidInput = rowEl?.querySelector('input[name="bid_fixed_value"]');
-
-            if (!bidInput) continue;
-
-            bidInput.value = targetBid.toFixed(2);
-            bidInput.dispatchEvent(new Event("input", { bubbles: true }));
-            bidInput.dispatchEvent(new Event("change", { bubbles: true }));
-            bidInput.style.backgroundColor = "#fff3cd";
-            preparedCount++;
-            await utils.wait(200);
-        }
-
-        console.log(`✅ 已完成 ${preparedCount} 筆高 ACOS 關鍵字降價準備，未自動儲存`);
-    }
-
-    // -----------------------------
     // 單列移動與長尾關鍵字勾選
     // -----------------------------
     // 這兩個功能分別負責用鍵盤移動目前選取列，
@@ -382,15 +255,6 @@
 
         await sortByCheckBox();
         utils.scrollFirstSelectedToTop(table);
-    }
-
-    function calculateHighAcosTargetBid({ acos, bidVal, cpcVal }) {
-        if (!(acos > 0.2) || !(bidVal > 0) || !(cpcVal > 0)) return NaN;
-
-        const rawTargetBid = cpcVal * 0.2 / acos;
-        const roundedTargetBid = Math.round(rawTargetBid * 100) / 100;
-
-        return Math.max(roundedTargetBid, 0.05);
     }
 
     // -----------------------------
