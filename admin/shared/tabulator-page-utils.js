@@ -35,6 +35,7 @@
 
     const TOAST_CONTAINER_ID = "tm-page-toast-container";
     let toastHideTimer = null;
+    const scrollPersistenceRegistry = new Map();
 
     function ensureToastContainer() {
         let container = document.getElementById(TOAST_CONTAINER_ID);
@@ -217,6 +218,126 @@
     }
 
     // -----------------------------
+    // 捲動位置保存與恢復
+    // -----------------------------
+    // 部分 Admin 頁面在 SPA 切換前後會重建表格，
+    // 因此這裡額外保存 window 與 table holder 的 scroll 位置，並在回來後嘗試恢復。
+    function getScrollStateKey(key) {
+        return `tm-admin-scroll:${key}:${location.pathname}${location.search}`;
+    }
+
+    function readScrollState(stateKey) {
+        try {
+            const raw = sessionStorage.getItem(stateKey);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== "object") return null;
+            if (typeof parsed.ts !== "number") return null;
+            // 只恢復近期的暫存，避免使用者之後重新開頁還被舊位置影響。
+            if (Date.now() - parsed.ts > 30 * 60 * 1000) {
+                sessionStorage.removeItem(stateKey);
+                return null;
+            }
+            return parsed;
+        } catch (err) {
+            console.warn("Failed to read persisted scroll state", err);
+            return null;
+        }
+    }
+
+    function writeScrollState(stateKey, selector) {
+        try {
+            const holder = document.querySelector(`${selector} .tabulator-tableholder`);
+            const payload = {
+                ts: Date.now(),
+                windowY: window.scrollY || window.pageYOffset || 0,
+                holderY: holder ? holder.scrollTop : null
+            };
+            sessionStorage.setItem(stateKey, JSON.stringify(payload));
+        } catch (err) {
+            console.warn("Failed to persist scroll state", err);
+        }
+    }
+
+    function bindHolderScrollListener(entry, selector) {
+        const holder = document.querySelector(`${selector} .tabulator-tableholder`);
+        if (!holder || entry.boundHolder === holder) return;
+
+        entry.boundHolder = holder;
+        holder.addEventListener("scroll", entry.save, { passive: true });
+    }
+
+    function scheduleScrollRestore(entry, selector) {
+        if (entry.restoreTimer) {
+            clearTimeout(entry.restoreTimer);
+            entry.restoreTimer = null;
+        }
+
+        const state = readScrollState(entry.stateKey);
+        if (!state) return;
+
+        let remainingAttempts = 8;
+        const attemptRestore = () => {
+            const latest = readScrollState(entry.stateKey);
+            if (!latest) return;
+
+            const holder = document.querySelector(`${selector} .tabulator-tableholder`);
+            window.scrollTo(0, latest.windowY || 0);
+            if (holder && typeof latest.holderY === "number") {
+                holder.scrollTop = latest.holderY;
+            }
+
+            remainingAttempts -= 1;
+            if (remainingAttempts > 0) {
+                entry.restoreTimer = setTimeout(attemptRestore, 120);
+                return;
+            }
+
+            sessionStorage.removeItem(entry.stateKey);
+            entry.restoreTimer = null;
+        };
+
+        attemptRestore();
+    }
+
+    function installScrollPersistence(key, selector) {
+        let entry = scrollPersistenceRegistry.get(key);
+        if (!entry) {
+            const stateKey = getScrollStateKey(key);
+            let saveScheduled = false;
+            const save = () => {
+                if (saveScheduled) return;
+                saveScheduled = true;
+                requestAnimationFrame(() => {
+                    saveScheduled = false;
+                    writeScrollState(stateKey, selector);
+                });
+            };
+
+            entry = {
+                boundHolder: null,
+                restoreTimer: null,
+                save,
+                stateKey
+            };
+
+            window.addEventListener("scroll", save, { passive: true });
+            window.addEventListener("pagehide", save);
+            window.addEventListener("beforeunload", save);
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "hidden") {
+                    save();
+                }
+            });
+
+            scrollPersistenceRegistry.set(key, entry);
+        }
+
+        bindHolderScrollListener(entry, selector);
+        scheduleScrollRestore(entry, selector);
+    }
+
+    // -----------------------------
     // 對外匯出
     // -----------------------------
     // 將共用方法統一掛到全域，
@@ -228,6 +349,7 @@
         getTableBySelector,
         isEditingEvent,
         scrollFirstSelectedToTop,
+        installScrollPersistence,
         showAlert,
         sortByField,
         startInitObserver,

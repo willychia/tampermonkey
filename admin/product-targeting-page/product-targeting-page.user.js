@@ -75,6 +75,8 @@
         table = getTable();
         if (!table) return;
 
+        utils.installScrollPersistence("product-targeting-page", SELECTOR);
+
         if (!table[TABLE_FLAG]) {
             setupColumns(table);
             bindTableEvents(table);

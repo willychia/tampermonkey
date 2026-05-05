@@ -22,9 +22,12 @@
     const SELECTOR = "#ad-groups-table";
     // 在 Tabulator 實例上打旗標，避免同一張表被重複修補欄位與綁事件。
     const TABLE_FLAG = "__agp_stable_v9";
+    const SCROLL_STATE_KEY = `tm-admin-scroll:ad-group-page:${location.pathname}${location.search}`;
     let table = null;
     let uiBoundTable = null;
     let observerStarted = false;
+    let boundScrollHolder = null;
+    let scrollRestoreTimer = null;
 
     // -----------------------------
     // 基礎工具函式
@@ -54,6 +57,94 @@
             if (nodeTouchesSelector(mutation.target)) return true;
             return [...mutation.addedNodes, ...mutation.removedNodes].some((node) => nodeTouchesSelector(node));
         });
+    }
+
+    function readScrollState() {
+        try {
+            const raw = sessionStorage.getItem(SCROLL_STATE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed.ts !== "number") return null;
+            if (Date.now() - parsed.ts > 30 * 60 * 1000) {
+                sessionStorage.removeItem(SCROLL_STATE_KEY);
+                return null;
+            }
+            return parsed;
+        } catch (err) {
+            console.warn("Failed to read persisted scroll state", err);
+            return null;
+        }
+    }
+
+    function persistScrollState() {
+        try {
+            const holder = document.querySelector(`${SELECTOR} .tabulator-tableholder`);
+            sessionStorage.setItem(SCROLL_STATE_KEY, JSON.stringify({
+                ts: Date.now(),
+                windowY: window.scrollY || window.pageYOffset || 0,
+                holderY: holder ? holder.scrollTop : null
+            }));
+        } catch (err) {
+            console.warn("Failed to persist scroll state", err);
+        }
+    }
+
+    function bindHolderScrollPersistence() {
+        const holder = document.querySelector(`${SELECTOR} .tabulator-tableholder`);
+        if (!holder || holder === boundScrollHolder) return;
+
+        boundScrollHolder = holder;
+        holder.addEventListener("scroll", persistScrollState, { passive: true });
+    }
+
+    function restoreScrollState() {
+        if (scrollRestoreTimer) {
+            clearTimeout(scrollRestoreTimer);
+            scrollRestoreTimer = null;
+        }
+
+        const state = readScrollState();
+        if (!state) return;
+
+        let remainingAttempts = 8;
+        const attemptRestore = () => {
+            const latest = readScrollState();
+            if (!latest) return;
+
+            const holder = document.querySelector(`${SELECTOR} .tabulator-tableholder`);
+            window.scrollTo(0, latest.windowY || 0);
+            if (holder && typeof latest.holderY === "number") {
+                holder.scrollTop = latest.holderY;
+            }
+
+            remainingAttempts -= 1;
+            if (remainingAttempts > 0) {
+                scrollRestoreTimer = setTimeout(attemptRestore, 120);
+                return;
+            }
+
+            sessionStorage.removeItem(SCROLL_STATE_KEY);
+            scrollRestoreTimer = null;
+        };
+
+        attemptRestore();
+    }
+
+    function installScrollPersistence() {
+        if (!window.__agpScrollPersistenceBound) {
+            window.__agpScrollPersistenceBound = true;
+            window.addEventListener("scroll", persistScrollState, { passive: true });
+            window.addEventListener("pagehide", persistScrollState);
+            window.addEventListener("beforeunload", persistScrollState);
+            document.addEventListener("visibilitychange", () => {
+                if (document.visibilityState === "hidden") {
+                    persistScrollState();
+                }
+            });
+        }
+
+        bindHolderScrollPersistence();
+        restoreScrollState();
     }
 
     // -----------------------------
@@ -107,6 +198,8 @@
     function initEnhancements() {
         table = getTable();
         if (!table) return;
+
+        installScrollPersistence();
 
         if (!table[TABLE_FLAG]) {
             // 某些 Tabulator 欄位定義是動態生成的，初始化後再補強比較穩定。
