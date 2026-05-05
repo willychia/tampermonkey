@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Admin - Ad Group Page
 // @namespace    http://tampermonkey.net/
-// @version      2026.04.28.1
+// @version      2026.05.05.2
 // @description  修正跳頂問題、優化選取邏輯、強化捲軸位置保持。
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/ad_groups?*

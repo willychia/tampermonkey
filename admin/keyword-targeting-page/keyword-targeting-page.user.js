@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Admin - Keyword Targeting Page
 // @namespace    http://tampermonkey.net/
-// @version      2026.05.05.1
+// @version      2026.05.05.2
 // @description  Keyword Targeting 加強版：長尾關鍵字勾選、批次選取、匯出與 UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/keywords?*

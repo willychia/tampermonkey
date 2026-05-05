@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Ads Team Toolbox - Admin - Target Page
 // @namespace    http://tampermonkey.net/
-// @version      2026.05.05.1
+// @version      2026.05.05.2
 // @description  Target Page 加強版：批次選取、匯出與 UI 優化
 // @author       Willy Chia
 // @match        https://admin.hourloop.com/amazon_ads/sp/targets?*
